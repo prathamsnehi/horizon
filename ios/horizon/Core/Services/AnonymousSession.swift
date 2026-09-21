@@ -3,7 +3,8 @@
 //  horizon
 //
 //  The app's identity, without ever asking for one: a Firebase anon session
-//  minted on the first call. Why not App Check alone → docs/developer/.
+//  minted on the first call. The security boundary is documented in the root
+//  backend and API references.
 //
 
 import Foundation

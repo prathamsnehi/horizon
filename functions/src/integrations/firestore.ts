@@ -37,10 +37,10 @@ function getDb(): Firestore {
 // ------------------------------
 // End-to-end generation samples (generation_samples)
 // ------------------------------
-// One anonymous record per generation: pipeline waterfall, inputs, outputs,
-// and outcome. Doubles as the error log and the training corpus. Carries no
-// uid and nothing that could re-link samples to a person, so it runs in every
-// environment and is retained indefinitely (no TTL, unlike pregen_cache).
+// One de-identified record per generation: pipeline waterfall, inputs, outputs,
+// and outcome. Doubles as the error log and the evaluation corpus. Carries no
+// stable identity, but retained profile signals can still be identifying in
+// unusual combinations; see docs/backend/observability.md.
 // ------------------------------
 
 const GENERATION_SAMPLES_COLLECTION = "generation_samples";
@@ -246,7 +246,7 @@ const RATE_LIMITS_COLLECTION = "user_rate_limits";
 
 /**
  * Whether a uid is exempt from the 24h limit (developer accounts — see
- * `rateLimitExemptUids` in config.ts and docs/developer/secrets.md).
+ * `rateLimitExemptUids` in config.ts and docs/operations/secrets.md).
  * The list lives in Secret Manager, never in source, and is empty when unset.
  *
  * Secrets are only readable while a function is executing, so this is resolved

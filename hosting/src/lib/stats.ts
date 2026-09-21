@@ -70,7 +70,7 @@ export interface DashboardStats {
   /** Share of curated requests served from the pre-generation cache. */
   cacheHitRate: Ratio;
   /** Share of Maps lookups that resolved a real place. Below ~50% the Scout
-   *  prompt is the suspect, not Maps — see docs/agent/architecture.md. */
+   *  prompt is the suspect, not Maps — see docs/backend/architecture.md. */
   mapsResolutionRate: Ratio;
   /** Share of pipeline runs that needed location-free quests to fill a deficit. */
   genericFallbackRate: Ratio;

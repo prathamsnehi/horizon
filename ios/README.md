@@ -1,42 +1,60 @@
-# Horizon
+# Horizon for iOS
 
-An iPhone app that generates AI-powered real-world "quests" — small challenges
-built around what you avoid — then lets you document them with photos and a
-journal entry.
+The SwiftUI client for Horizon, an iPhone app that turns a user's interests and
+comfort-zone edges into real-world quests. Generated quests can be chosen from a
+swipe deck, completed with photos and a journal entry, and revisited in a
+logbook.
 
-You name your comfort-zone edges during onboarding, pull a fresh hand of quests
-each day, swipe to commit to one, and log it when it's done.
+The rest of the product lives in this repository: `../functions/` contains the
+Firebase backend and `../hosting/` contains the public site and admin dashboard.
 
-## Stack
+## Requirements
 
-- **SwiftUI**, iOS 18.6+, iPhone only
-- **SwiftData** for persistence, mirrored to the user's private iCloud database
-  via CloudKit
-- **Firebase** — anonymous Auth (no sign-in screen), Cloud Functions for
-  generation, App Check
-- **MapKit** for the city picker and quest locations
+- Full Xcode with an iOS 18.6-or-newer SDK/runtime
+- An iPhone simulator or signing access for a physical device
+- Network access the first time Swift Package Manager resolves
+  `firebase-ios-sdk`
 
-No third-party dependencies beyond `firebase-ios-sdk`.
+The app target is iPhone-only with a minimum deployment target of iOS 18.6.
+Firebase configuration and CloudKit entitlements are committed for the Horizon
+project; backend secrets are not client configuration and must never be added
+here.
 
-## Running it
+## Run
 
-Open `horizon.xcodeproj` in Xcode and run — SPM resolves Firebase on first
-build, and `GoogleService-Info.plist` is committed, so there's no setup step.
+Open `horizon.xcodeproj`, select the `horizon` scheme, and run on an iPhone
+simulator or device. Existing quests, completion, and the logbook work offline;
+generating quests calls the deployed Firebase project configured by
+`horizon/GoogleService-Info.plist`.
 
-The generation backend lives in a separate repo. Without it the app still runs:
-onboarding, the deck, completion, and the logbook all work offline against
-whatever quests are already stored.
+Debug builds use Firebase's App Check debug provider. When App Check enforcement
+is enabled, register the token printed by a new simulator or development install
+in the Firebase console before testing generation. Release builds use App
+Attest and should be exercised on real hardware.
 
-## Docs
+For a command-line compile check:
 
-`CLAUDE.md` is the orientation file and routes to the rest. Briefly:
+```bash
+xcodebuild \
+  -project ios/horizon.xcodeproj \
+  -scheme horizon \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
 
-| | |
-| --- | --- |
-| `docs/concept.md` | what the app is and the full user flow |
-| `docs/design.md` | design language, components, palette |
-| `docs/architecture/` | models, backend contract, screens, key decisions |
-| `docs/milestones.md` | what's built and what's left for v1 |
-| `docs/future-features.md` | not built — don't build unless asked |
+Run this from the repository root. There is currently no iOS test target or iOS
+CI workflow, so meaningful changes also need focused simulator or device QA.
 
-Anything already built, the code is the reference.
+## Documentation
+
+- `AGENTS.md` — task routing, conventions, invariants, and verification guidance
+- `docs/product.md` — product intent and current user flow
+- `docs/architecture.md` — app structure, persistence, lifecycle, and navigation
+- `docs/design.md` — durable visual and interaction system
+- `docs/backlog.md` — explicitly deferred work and release checks
+- `../docs/api/api-contracts.md` — canonical client/backend wire contract
+
+For implemented behavior, Swift source is authoritative. Update a durable doc
+only when its invariant or contract changes; avoid documenting view internals
+that are already clear from the code.

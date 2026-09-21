@@ -20,7 +20,7 @@ export const cerebrasApiKey = defineSecret("CEREBRAS_API_KEY");
  * Stored in Secret Manager rather than a file, so the value survives every
  * deploy regardless of who triggers it (a `.env` is gitignored and therefore
  * invisible to CI, which would silently reset the list on each pipeline run).
- * See docs/developer/secrets.md for how to set it.
+ * See docs/operations/secrets.md for how to set it.
  *
  * Unset resolves to "" — nobody exempt — so an environment that configures
  * nothing gates every user normally.

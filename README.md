@@ -1,172 +1,209 @@
 # Horizon
 
-**Turns who you are into real-world quests just past the edge of your comfort zone.**
+**A full-stack iPhone app that turns the edges of a user's comfort zone into
+small, real-world quests.**
 
-You tell Horizon what makes you hesitate. It returns a handful of quests at real places
-near you — each tied to an actual venue, sized to your budget and travel radius, and
-written to push one step past your usual.
+[Website](https://usehorizon.app) ·
+[TestFlight](https://testflight.apple.com/join/brUjqFkr) ·
+[Privacy](https://usehorizon.app/privacy)
 
-🌐 · 📱 iOS, currently in TestFlight beta
+<img src="docs/assets/demo.gif" alt="Horizon on iOS: choosing comfort-zone edges, receiving a quest, and committing to it" width="280">
 
-<img src="docs/assets/demo.gif" alt="Horizon on iOS: swiping hesitation cards, receiving a curated quest, and committing to it" width="260">
+Horizon asks what makes someone hesitate, along with their interests, city,
+budget, and transportation constraints. It uses that context to generate a
+small set of practical quests—often tied to real nearby places—then gives the
+user a private space to commit to one, complete it, and reflect with photos and
+a journal entry.
 
-`TypeScript` · `Firebase Cloud Functions (gen 2)` · `Node 22` · `React 19` · `Vite` · `Firestore` · `Vercel AI SDK` · `Zod`
+This repository contains the complete product: the native iOS application, its
+serverless generation backend, the public website, and an internal operations
+dashboard.
 
----
+## Product flow
 
-## What's in this repo
+1. **Onboarding** identifies comfort-zone edges and practical preferences.
+2. **Explore** presents generated quests in a nondestructive swipe deck.
+3. **Quest** holds one active commitment, with place and travel context when
+   relevant.
+4. **Completion and Logbook** preserve photos and reflections in the user's
+   private SwiftData/CloudKit store.
 
-This is the **backend and web** half of Horizon: Cloud Functions, Firestore rules, the
-marketing site, and an internal admin dashboard. The SwiftUI iOS client lives in a separate
-private repository — nothing here depends on it, and the API contract is documented below.
+The product is intentionally not a social network: there are no feeds, public
+profiles, streaks, or engagement mechanics. The focus is choosing an action and
+following through.
 
-The interesting problem is that quest generation is **expensive, slow, and unreliable by
-nature**: it fans out across LLM providers and the Google Places API, any of which can rate-limit
-or fail mid-request. Most of the engineering below is about making that produce something
-good, cheaply, every time.
+## Engineering scope
 
-## Architecture
+| Domain | Technologies | Responsibility in Horizon |
+| --- | --- | --- |
+| Native iOS | Swift, SwiftUI, SwiftData, CloudKit, MapKit | Onboarding, quest discovery, lifecycle state, offline content, photos, journaling, and native platform integration |
+| Backend and AI | TypeScript, Firebase Cloud Functions, Firestore, Cloud Tasks, Vercel AI SDK, Zod, Google Places | Authenticated generation APIs, place resolution, model routing, pre-generation, rate limiting, and observability |
+| Web frontend | React, Vite, Tailwind CSS, Motion | Public product showcase, privacy policy, responsive interactions, and aggregate website analytics |
+| Internal tooling and delivery | Firebase Auth, App Check, Secret Manager, Firestore Rules, GitHub Actions | Admin authorization, operational dashboards, secret binding, deployment, and environment safeguards |
 
-Cloud Functions organised **Controller → Service → Integration**, with two cross-cutting
-layers. Controllers only do Firebase things; services take plain arguments and return plain
-objects, which is what makes them unit-testable; integrations wrap third-party SDKs so a
-vendor swap touches one file.
+## iOS application — Swift and SwiftUI
+
+The iOS client is a native SwiftUI application organized around SwiftData
+models, focused screen models, and small services for external work.
+
+- **Local-first persistence.** `UserProfile` and `Quest` live in SwiftData and
+  mirror to the user's private CloudKit database. Existing quests and the
+  logbook remain usable offline; location and journal photos use external
+  storage on the models rather than a parallel file-management layer.
+- **Explicit lifecycle rules.** Model and screen logic enforce one active quest,
+  nondestructive left swipes, safe swapping, separate replacement lanes for
+  curated and user-described quests, and append-only onboarding generation.
+- **Typed async service boundary.** Codable request/response types isolate the
+  Firebase callable contract. The service establishes anonymous Auth, maps
+  transport and Functions failures into app-level errors, reconciles server
+  retry times, and decodes place photos once for persistent offline display.
+- **Structured concurrency.** An actor coalesces concurrent anonymous sign-in
+  attempts, while the first generation runs independently of the onboarding
+  walkthrough so network latency does not block product education.
+- **Native platform work.** The app uses MapKit city search and maps, camera and
+  photo-library capture, App Check debug/App Attest modes, typed navigation,
+  adaptive SwiftUI layouts, and light/dark design tokens.
+
+More detail: [`ios/docs/architecture.md`](ios/docs/architecture.md) and
+[`ios/docs/design.md`](ios/docs/design.md).
+
+## Backend — TypeScript and Firebase
+
+The backend is a Firebase Cloud Functions gen 2 service on Node 22. Its deployed
+surface includes two authenticated quest-generation callables, a Cloud Tasks
+worker that prepares the next curated batch, and an aggregate marketing-metrics
+endpoint.
+
+- **Clear system boundaries.** Firebase concerns stay in controllers, quest
+  orchestration stays in framework-light services, and Firestore, Places, and
+  model providers sit behind integrations. Pure validation, distance, hashing,
+  schema, prompt, and rate-limit logic can be tested without live services.
+- **Cache-first generation.** A curated request can consume a profile-matched,
+  TTL-validated Firestore batch. The next batch is produced asynchronously by a
+  Cloud Task; a cache or queue miss remains correct because synchronous
+  generation is always available.
+- **Failure-safe quotas.** Requests validate before spend, reserve a short
+  transactional pending slot, and commit the rolling 24-hour stamp only after
+  delivery. Failures release the reservation or allow it to expire, preventing
+  a failed request from consuming the user's daily opportunity.
+- **Provider-aware model routing.** Structured outputs are validated with Zod,
+  candidate models are ordered by recorded quota headroom, and transient or
+  schema failures move to the next provider. SDK retries are disabled so the
+  router—not a hidden retry loop—owns failover behavior.
+- **Graceful degradation.** Missing Places results are dropped, generic quests
+  fill a short batch, unresolved described locations fall back to a
+  location-free quest, photo attachment is best-effort, and pre-generation
+  failure does not fail the current request.
+- **Privacy-aware observability.** Request-scoped traces capture pipeline timing
+  and provider attempts while excluding stable identities, profile hashes,
+  additional context, rendered prompts, and media bytes. The documentation
+  calls this data de-identified rather than claiming it is fully anonymous.
+
+More detail: [`docs/backend/architecture.md`](docs/backend/architecture.md),
+[`docs/backend/observability.md`](docs/backend/observability.md), and the
+canonical [`API contract`](docs/api/api-contracts.md).
+
+## Web frontend — React and Vite
+
+The web application serves three deliberately different surfaces from one
+React/Vite project:
+
+- **`/` — public showcase.** A responsive marketing page uses a scroll-driven
+  iPhone walkthrough, real product media, reduced-motion support, and a focused
+  path from product explanation to TestFlight.
+- **`/privacy` — product policy.** A lightweight, Firebase-free route explains
+  the app and website data boundaries in plain language.
+- **`/admin` — operations console.** A protected dashboard presents generation
+  outcomes, latency distributions, pipeline stages, Maps resolution,
+  cache/fallback/failover behavior, model usage, recent errors, paginated logs,
+  and per-request span waterfalls.
+
+Firebase and the admin application are lazy-loaded and isolated into separate
+build chunks, so public visitors do not download the internal data stack.
+Google sign-in establishes the operator identity, while Firestore rules and the
+`admins/{uid}` allowlist remain the authorization boundary.
+
+The public site avoids third-party analytics SDKs. A same-origin beacon updates
+aggregate daily counters for page views, visits, downloads, device class, and
+referrer hostname without storing cookies, IP addresses, user IDs, or individual
+visitor records.
+
+More detail: [`hosting/AGENTS.md`](hosting/AGENTS.md) and
+[`docs/operations/admin-dashboard.md`](docs/operations/admin-dashboard.md).
+
+## System overview
 
 ```mermaid
-flowchart TD
-    A[iOS client] -->|callable| B[generateCuratedQuests]
-    B --> C{Auth and payload valid}
-    C -->|no| X[HttpsError, no spend]
-    C -->|yes| D[Reserve rate slot, pending stamp]
-    D --> E{Pre-generated batch matches profile hash}
-    E -->|cache hit| K[Attach photos]
-    E -->|miss| F[Scout LLM emits Maps queries]
-    F --> G[Places API, parallel lookup]
-    G --> H[Haversine distance and transport heuristic]
-    H --> I[Writer LLM writes the quests]
-    I --> J[Generic location-free fills if short]
-    J --> K
-    K --> L[Commit rate slot]
-    L --> M[Enqueue next batch via Cloud Tasks]
-    M --> N[Return quests]
+flowchart LR
+    subgraph Client[SwiftUI iOS client]
+        A[Onboarding and profile]
+        B[Explore and quest lifecycle]
+        C[SwiftData and private CloudKit]
+    end
+
+    subgraph Backend[Firebase backend]
+        D[Callable controllers]
+        E[Quest services]
+        F[LLM router]
+        G[Google Places]
+        H[Firestore cache and limits]
+        I[Cloud Tasks pre-generation]
+        J[De-identified traces]
+    end
+
+    subgraph Web[React web app]
+        K[Public showcase and privacy]
+        L[Admin dashboard]
+    end
+
+    A --> D
+    B --> D
+    B --> C
+    D --> E
+    E --> F
+    E --> G
+    D --> H
+    D --> I
+    D --> J
+    K -->|Aggregate beacon| D
+    L -->|Auth and Firestore rules| J
 ```
 
-## Engineering highlights
-
-### Multi-provider LLM routing under free-tier limits
-
-Four providers — Gemini, then Groq, Mistral, Cerebras — behind one router. A Firestore-backed
-limiter tracks windows **per model, not per provider** (quotas are metered that way), and orders
-candidates by whichever has the most headroom in its scarcest window. On a 429, transient error,
-or schema violation it drains that model's window and fails over to the next candidate.
-
-`maxRetries: 0` is deliberate: the SDK's own retry would hammer a model that's already down
-before failover could happen.
-
-**It fails open.** If the limiter store is unavailable, routing falls back to static priority
-order — bookkeeping problems must never block generation.
-
-→ `functions/src/llm/router.ts`, `rateLimits.ts`, `rateMath.ts`
-
-### Crash-safe two-phase rate limiting
-
-A naive "stamp the user, then generate" limiter burns someone's daily quota when the process
-dies mid-request. Instead:
-
-- A **pending stamp** is written in a transaction _before_ any spend, blocking concurrent
-  duplicates and retries.
-- The **durable stamp** is set only on delivery, so the 24-hour window starts when quests
-  actually land.
-- Failure clears the pending stamp; a killed process lets it self-expire after 90s.
-
-A dead run costs the user 90 seconds, not a day. The TTL is deliberately kept above the 60s
-function timeout so a still-running generation can't be double-entered. The decision logic is
-pure and lives in `utils/rateLimit.ts`, which is why it's cheap to test.
-
-### Cache-first generation
-
-After serving a batch, a Cloud Task pre-generates the _next_ one in the background, keyed on a
-hash of the user's profile. The common path becomes a Firestore read instead of a multi-second
-LLM fan-out. A cached batch is only used if the profile hash still matches, so preference
-changes invalidate it correctly.
-
-### Cost as a design constraint
-
-Places calls request **Pro-tier fields only**, keeping every call on the cheaper Text Search SKU
-— the venue description that would have required a pricier field is written by the Writer LLM
-instead. Combined with pre-generation and `maxInstances` caps, the system runs within free tiers.
-
-### Privacy by construction
-
-The observability corpus carries **no uid**. Profiles sent to LLM providers hold abstract
-preferences only — never names, emails, or exact addresses — and coordinates are coarsened to
-city level before anything is written. De-identification happens at a single choke point
-(`observability/sanitize.ts`) rather than being reimplemented per call site, so it's one file to
-audit. Records can't be re-linked to a person, which is also why they can be retained for
-model evaluation.
-
-### Partial success over failure
-
-Nothing throws just because one dependency is unhappy. Fewer resolved venues than the target
-batch size doesn't fail the request — whatever resolved goes to the Writer, and location-free
-quests fill the deficit. A Places outage or a zero-coverage region still returns a usable batch.
-Photo attachment is best-effort: a failed fetch omits the image and the client shows a placeholder.
-
-## Frontend and delivery
-
-The marketing site at [usehorizon.app](https://usehorizon.app) is React 19 + Vite + Tailwind v4.
-
-- **354 KB first load** over the wire. Firebase is lazily code-split so the 443 KB SDK chunk
-  loads only for `/admin` — a visitor to the marketing page never downloads it.
-- **Scroll-scrubbed video showcase**: scroll position drives `currentTime` frame-by-frame.
-  This needs dense keyframes to seek smoothly, so clips are encoded with a 3-frame keyframe
-  interval — 0.125s seek granularity — and tuned against text legibility rather than by
-  bitrate alone. Posters are held over each clip until it's buffered, so a cold visitor sees a
-  still frame instead of a blank one.
-- **Cookieless analytics.** A `sendBeacon` call to a Cloud Function increments per-day counters.
-  No identifier, no IP, no per-visitor row — a visit is indistinguishable from any other, so it
-  needs no consent banner. Deliberately not Firebase Analytics, which would have pulled the
-  Firebase SDK back into the marketing bundle.
-- **Admin dashboard** for the generation pipeline: outcome breakdowns, stage latency, and
-  traffic, on a colour palette validated for colour-vision deficiency.
-
-## Repo layout
+## Repository structure
 
 ```text
-functions/          Cloud Functions (gen 2, Node 22)
-  controllers/      Firebase entrypoints — validation and error mapping only
-  services/         business logic, framework-free and unit-testable
-  integrations/     Places API, Firestore
-  llm/              provider registry, rate-aware router, Zod schemas
-  observability/    AsyncLocalStorage tracer, de-identification
-hosting/            React 19 + Vite — marketing site and admin dashboard
-firestore/          security rules and indexes
-docs/               architecture, API contract, runbooks
+ios/            SwiftUI application and iOS-specific documentation
+functions/      TypeScript Cloud Functions, tests, and provider integrations
+hosting/        React/Vite public site and admin dashboard
+firestore/      Security rules and composite indexes
+extensions/     Firebase extension configuration
+docs/           Backend, API, operations, and roadmap references
 ```
 
-## Testing
+Codex-oriented repository guidance begins in [`AGENTS.md`](AGENTS.md), with
+focused instruction files inside each application subtree.
 
-|          |                                                                             |
-| -------- | --------------------------------------------------------------------------- |
-| Backend  | **116 tests** across 14 files                                               |
-| Frontend | **17 tests**                                                                |
-| Types    | `strict` TypeScript on both halves, `noUnusedLocals` / `noUnusedParameters` |
+## Run and verify
 
-The layering is what makes this testable: rate-limit decisions, distance math, prompt
-construction, schema validation, and router failover are all pure functions, so they're covered
-without mocking Firebase.
+The backend and hosting applications use separate lockfiles and toolchains.
+From the repository root:
 
 ```bash
-cd functions && npx jest        # backend
-cd hosting  && npm test         # frontend
-npm run build                   # typecheck + production build
+# Backend — Node 22 and Yarn 1
+corepack yarn --cwd functions install --frozen-lockfile
+corepack yarn --cwd functions test --runInBand
+corepack yarn --cwd functions build
+
+# Web — Node 22 and npm
+npm --prefix hosting ci
+npm --prefix hosting test
+npm --prefix hosting run typecheck
+npm --prefix hosting run build
 ```
 
-## Docs
+For iOS, open `ios/horizon.xcodeproj` in full Xcode and run the `horizon` scheme
+on an iPhone simulator or physical device. The command-line build is documented
+in [`ios/README.md`](ios/README.md).
 
-|                                                            |                                                                 |
-| ---------------------------------------------------------- | --------------------------------------------------------------- |
-| [docs/agent/architecture.md](docs/agent/architecture.md)   | Request flows, rate limiting, routing, cost and privacy posture |
-| [docs/api/api-contracts.md](docs/api/api-contracts.md)     | Wire contract between the iOS app and backend                   |
-| [docs/agent/observability.md](docs/agent/observability.md) | Tracing model and the sample corpus                             |
-| [docs/developer/](docs/developer/)                         | Commands, secrets, launch checklist                             |
+Operational setup, secrets, and external release state are intentionally kept
+out of this overview. They live under [`docs/operations/`](docs/operations/).

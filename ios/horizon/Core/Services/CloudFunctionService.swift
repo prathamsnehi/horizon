@@ -3,7 +3,8 @@
 //  horizon
 //
 //  All Cloud Function calls via the typed Callable API; the request and
-//  response structs are the wire contract. See docs/architecture/03.
+//  response structs mirror the wire contract in the repository's
+//  docs/api/api-contracts.md.
 //
 
 import Foundation

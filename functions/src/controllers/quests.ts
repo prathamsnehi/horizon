@@ -85,9 +85,9 @@ async function enqueuePregen(payload: PregenTaskPayload): Promise<void> {
 /**
  * `generateCuratedQuests` — the client-facing daily batch.
  *
- * Cache-first: returns today's already-served batch (idempotent), else serves a
- * valid pre-generated batch, else generates synchronously. After serving, it
- * enqueues a Cloud Task to pre-generate the next batch. Count is server-controlled
+ * Cache-first: serves a valid pre-generated batch when present, else generates
+ * synchronously. After serving, it consumes that cache slot and enqueues a Cloud
+ * Task to pre-generate the next batch. Count is server-controlled
  * (CURATED_BATCH_SIZE); the request carries only { profile, excludeTitles? }.
  */
 export const generateCuratedQuests = functions.https.onCall(
@@ -175,9 +175,9 @@ export const generateCuratedQuests = functions.https.onCall(
           batch = await generateBatch(profile, CURATED_BATCH_SIZE, excludeTitles ?? []);
         }
 
-        // These two are independent and both best-effort — run them together:
-        // invalidate the consumed cache entry (so a failed re-gen can't re-serve
-        // the same batch) and queue up the next batch.
+        // These operations are independent, so run them together: invalidate
+        // the consumed cache entry (required, so it cannot be re-served) and
+        // best-effort queue the next batch.
         await Promise.all([
           clearPregenBatch(uid),
           enqueuePregen({ uid, profile }),
@@ -188,8 +188,8 @@ export const generateCuratedQuests = functions.https.onCall(
         // Record the assembled batch (reference-only, NO base64) as the trace result.
         setTraceField({ result: { quests: batch } });
 
-        // Embed hero-image bytes for the response ONLY, after persisting (so the
-        // stored/cached batch stays reference-only and under Firestore's 1MB cap).
+        // Embed hero-image bytes for the response ONLY. The selected cache batch
+        // and trace result stay reference-only and under Firestore's 1MB cap.
         // The commit runs in parallel — both are past the point of no return
         // (quests are landing), and photo attach is best-effort (never throws).
         // Commit starts the 24h window at delivery; a timeout before this leaves

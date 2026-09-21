@@ -172,8 +172,9 @@ export async function generateDescribed(
  * are left byte-free so the cached/stored versions stay small — Firestore 1MB —
  * and never persist Places imagery). Fetches run in parallel and are best-effort:
  * a place with no reference, or a failed fetch, simply yields a quest with no
- * embedded image (the client falls back to a placeholder). Call this AFTER
- * persisting the batch, on the value being returned to the client.
+ * embedded image (the client falls back to a placeholder). Call this only for
+ * the value being returned to the client, after any cache/trace representation
+ * has been kept reference-only.
  */
 export async function attachQuestPhotos(
   quests: QuestItem[]

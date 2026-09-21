@@ -1,65 +1,91 @@
-# Horizon
+# iOS agent guide
 
-A personal growth app that generates AI-powered real-world "quests" for users to complete, document with photos and journal entries, and share on social media.
+This file applies to everything under `ios/`. Follow repository-level guidance
+first, then use this file for iOS-specific work.
 
-## Docs — read what the task needs
+## Read only what the task needs
 
-Don't read everything up front; pull in the doc that matches the work:
-- **Models, deck rules, quest lifecycle** → `docs/architecture/02-data-models.md`
-- **Networking / backend contract** (endpoints, request/response shapes, error codes) → `docs/architecture/03-api-contracts.md`
-- **Any UI work** → `docs/design.md` (design language, component rules, palette)
-- **Planning a phase / "what's next"** → `docs/milestones.md`
-- **Philosophy and the full user flow** → `docs/concept.md`
-- **Unbuilt work** (sharing, notifications) → `docs/future-features.md` and `docs/architecture/04-screens-and-navigation.md`
-- **Architecture pattern + key decisions** → `docs/architecture/01-overview.md`
-- **Why the backend is protected the way it is** → `docs/developer/security-hardening-checklist.md`
+- Product behavior or deck semantics: `docs/product.md`
+- Persistence, lifecycle, navigation, or service boundaries:
+  `docs/architecture.md`
+- UI, interaction, color, typography, or motion: `docs/design.md`
+- Planned or explicitly deferred work: `docs/backlog.md`
+- Client/backend payloads and errors: `../docs/api/api-contracts.md`
+- Backend implementation: `../functions/src/`
 
-Everything built — onboarding, walkthrough, Explore, Quest, Logbook, Settings — the code is the reference.
+Do not create a second API contract under `ios/`. When a wire shape changes,
+update the backend types, the canonical root contract, and
+`horizon/Core/Services/CloudFunctionService.swift` together.
 
-## Key Rules
+## Project facts
 
-- **Never start coding without being told to.** Plan and align first.
-- **Always read files before editing.** The user writes code independently between sessions — never assume a file's contents.
-- **No Combine.** Use async/await and structured concurrency.
-- **iPhone only.** No iPad or Mac layouts.
+- Project, scheme, and app target: `horizon`
+- SwiftUI; iPhone only; minimum deployment target iOS 18.6
+- Swift 5 language mode with approachable concurrency and default MainActor
+  isolation enabled in the Xcode project
+- SwiftData mirrored to the user's private CloudKit database
+- Firebase Auth, App Check, and callable Cloud Functions through
+  `firebase-ios-sdk` 12.15+
+- `horizon/` is a filesystem-synchronized Xcode group. New Swift files beneath
+  it are discovered automatically; do not add manual PBX file entries for them.
 
-## Styling
+Source layout:
 
-Use custom colors from `Assets.xcassets` — never hardcode hex values:
-```swift
-Color("AppBackground")      // screen backgrounds
-Color("AppPrimary")          // buttons, accents (warm peach-orange, same light+dark)
-Color("AppSurface")          // card backgrounds
-Color("AppPrimaryText")      // headings, body text
-Color("AppSecondaryText")    // metadata, timestamps
+- `horizon/App/` — app entry point and cross-tab navigation
+- `horizon/Core/Models/` — SwiftData models, profile vocabulary, and validation
+- `horizon/Core/ViewModels/` — screen state and orchestration
+- `horizon/Core/Services/` — Firebase, city search, image caching, and resets
+- `horizon/Views/<Feature>/` — screens and feature-local components
+- `horizon/Views/Components/` — reusable app-wide UI
+
+## Load-bearing invariants
+
+- SwiftData models mirrored through CloudKit must keep every stored property
+  optional or defaulted and must not use unique constraints. `UserProfile` is a
+  singleton by convention and is deduplicated on foreground.
+- Authentication is anonymous and lazy. `request.auth.uid` is the server-side
+  identity; never add a client identifier to a callable payload.
+- Place photos arrive as base64, are decoded once, and persist as external
+  storage `Data`. Journal photos also live on `Quest`. Do not introduce image
+  URLs, a file layer, or a client-visible Maps key.
+- There is at most one `.active` quest. A left swipe is nondestructive. A new
+  curated set replaces only available personalized cards; a described quest
+  replaces only the available described card. Active and completed quests are
+  untouched. The onboarding generation is the one append-only exception.
+- Client generation timestamps are UX gates only. The backend's per-uid rolling
+  window is authoritative, and `retryAt` reconciles local state.
+- Profile string collections accept presets and custom values. Keep
+  `LocationPreference.anywhere` mutually exclusive with specific locations.
+- Prefer async/await and structured concurrency; do not add Combine for new
+  work. Screen models that perform UI/state work remain MainActor-isolated.
+- Use the named colors in `Assets.xcassets`, support light and dark mode, and
+  reuse `Views/Components` before creating a feature-local duplicate.
+
+## Development and verification
+
+Open `horizon.xcodeproj` with full Xcode. The committed
+`GoogleService-Info.plist` selects the deployed Firebase project. Debug builds
+use the App Check debug provider; with enforcement enabled, register the debug
+token printed by each new simulator or development install. Release App Check
+uses App Attest and requires real-device QA.
+
+From the repository root, compile with:
+
+```bash
+xcodebuild \
+  -project ios/horizon.xcodeproj \
+  -scheme horizon \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  build
 ```
 
-Both color schemes are supported; all five have light/dark variants except `AppPrimary`.
+There is currently no iOS test target, shared iOS CI job, SwiftLint, or
+SwiftFormat configuration. Report the build and the focused manual scenarios
+you ran; if full Xcode or a suitable runtime is unavailable, report that clearly
+instead of implying verification.
 
-Design philosophy: **"The Expedition Dossier"** — minimal and calm, but crafted. Depth through light, editorial typography, and motion only when continuously meaningful or as press physics (no one-shot entrance animations). Reusable pieces live in `Views/Components/`; feature-specific ones in `Views/<Feature>/Components/`. Haptics on key interactions. Full language and component specs: `docs/design.md`.
-
-## Architecture at a Glance
-
-- **SwiftData** for persistence (`UserProfile`, `Quest`), mirrored to the user's private iCloud DB via `ModelConfiguration(cloudKitDatabase: .automatic)`. No sync code; onboarding always re-asks the questionnaire on reinstall, and synced-in data appears when it lands (profiles deduped on foreground).
-- **Firebase Auth (anonymous)** — no sign-in screen. `AnonymousSession` mints a session silently on the first Cloud Function call. The uid is the only identity: it keys the server-side daily limits and the pre-gen cache, and rides on Callable requests automatically (never in a payload).
-- **Firebase Cloud Functions** for AI generation; multi-provider LLM routing and the pre-gen cache (Firestore) are backend concerns.
-- **All photos are `Data` on the models** (`@Attribute(.externalStorage)`) — journal photos as JPEG `[Data]`, place photos decoded once from base64 embedded in the generation response. No file layer, no image URLs, no image-loading library, and the Maps key never reaches the client.
-- **Local notifications** for stale-quest and re-engagement reminders (v2).
-- **MapKit** inline on the Quest view for location-based quests.
-
-Folder layout: `docs/architecture/01-overview.md`.
-
-## Data Model Quick Reference
-
-- **UserProfile** — singleton; onboarding results + city + client-side daily-limit timestamps. `comfortZoneEdges` / `interests` / `vibes` are free-form `[String]` (preset pills + user customs — no enums; `vibes` goes over the wire as `vibe`). `locationPreferences`' `.anywhere` is mutually exclusive with the rest. Preset lists and the edge catalogue live in `Core/Models/ProfileVocabulary.swift`.
-- **`comfortZoneEdges` is the app's premise made data** — what the user avoids, picked in onboarding's edge deck. Quests come back stamped with `pushesComfortZoneEdges` (which of those this quest targets, primary first). Input list vs per-quest pick — don't conflate them.
-- **Quest** — `status` is `.available` / `.active` / `.completed` (no skipped state — left swipe is non-destructive); `origin` is `.personalized` or `.described`. One active quest at a time. Photos required for completion.
-
-## Core User Flow
-
-1. **Onboarding** — 4 resonance cards → the **edge deck** as its own full-screen beat (9 comfort-zone edges, swipe right on the ones that make you hesitate) → 4 questionnaire steps (`01 The Edge`, `02 How Far`, `03 The Draw`, `04 The Ground`) → "Generate My Quests" saves the profile and fires the first set while a 3-card walkthrough masks the ~10–20s cold generation. Nothing waits on it.
-2. **Explore** — a looping Tinder-style deck opening on a **base card** (today's actions), then one quest per card. Right swipe (or ♥) → confirmation → active. Left swipe (or ✕) = "not now", never destructive. Two once-per-day actions add cards: generate a personalized set (nominally 3) or describe your own (1).
-3. **Quest** — the single active quest, with map and Get Started guide.
-4. **Complete** → other cards stay in the deck. **Swap** just opens the deck; the current quest stays active until another is committed, so backing out costs nothing.
-
-**The two deck rules:** each lane replaces its own unaccepted cards — a personalized generation replaces the previous personalized cards (Rule 1); describing replaces the previous unaccepted described card, a single custom slot (Rule 2). The active and completed quests are never touched. **One exception:** onboarding's first generation appends, so a reinstalling user keeps iCloud-restored cards. Daily limits are enforced server-side; the client mirrors them for UX gating only. No reroll/dice feature — swiping is the discovery mechanism.
+For UI changes, exercise both color schemes and relevant accessibility sizes.
+For persistence changes, test an existing store and CloudKit-compatible model
+rules. For generation changes, cover offline, malformed/error, rate-limited,
+empty/partial response, and success paths as applicable.

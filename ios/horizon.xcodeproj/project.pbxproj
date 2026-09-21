@@ -13,16 +13,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		476939E82FE338FB00F74127 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
-		476939EB2FE338FB00F74127 /* concept.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = concept.md; sourceTree = "<group>"; };
+		476939E82FE338FB00F74127 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
+		476939EB2FE338FB00F74127 /* product.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = product.md; sourceTree = "<group>"; };
 		476939ED2FE338FB00F74127 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		476939EE2FE3497200F74127 /* 01-overview.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "01-overview.md"; sourceTree = "<group>"; };
-		476939EF2FE3497200F74127 /* 02-data-models.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "02-data-models.md"; sourceTree = "<group>"; };
-		476939F02FE3497200F74127 /* 03-api-contracts.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "03-api-contracts.md"; sourceTree = "<group>"; };
-		476939F12FE3497200F74127 /* 04-screens-and-navigation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "04-screens-and-navigation.md"; sourceTree = "<group>"; };
+		476939EE2FE3497200F74127 /* architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = architecture.md; sourceTree = "<group>"; };
+		476939EF2FE3497200F74127 /* backlog.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = backlog.md; sourceTree = "<group>"; };
 		476939F52FE3983E00F74127 /* design.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = design.md; sourceTree = "<group>"; };
-		476939F62FE3B90700F74127 /* milestones.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = milestones.md; sourceTree = "<group>"; };
-		47A047602FF10A1E0078880F /* future-features.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "future-features.md"; sourceTree = "<group>"; };
 		47F8868A2FD7ACB3006F2DB6 /* horizon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = horizon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -37,11 +33,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		476947E43005BBBC0098AE9F /* developer */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = developer;
-			sourceTree = "<group>";
-		};
 		47F8868C2FD7ACB3006F2DB6 /* horizon */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -69,25 +60,12 @@
 		476939EC2FE338FB00F74127 /* docs */ = {
 			isa = PBXGroup;
 			children = (
-				476947E43005BBBC0098AE9F /* developer */,
-				47A047602FF10A1E0078880F /* future-features.md */,
-				476939F62FE3B90700F74127 /* milestones.md */,
+				476939EB2FE338FB00F74127 /* product.md */,
+				476939EE2FE3497200F74127 /* architecture.md */,
 				476939F52FE3983E00F74127 /* design.md */,
-				476939F32FE3497200F74127 /* architecture */,
-				476939EB2FE338FB00F74127 /* concept.md */,
+				476939EF2FE3497200F74127 /* backlog.md */,
 			);
 			path = docs;
-			sourceTree = "<group>";
-		};
-		476939F32FE3497200F74127 /* architecture */ = {
-			isa = PBXGroup;
-			children = (
-				476939EE2FE3497200F74127 /* 01-overview.md */,
-				476939EF2FE3497200F74127 /* 02-data-models.md */,
-				476939F02FE3497200F74127 /* 03-api-contracts.md */,
-				476939F12FE3497200F74127 /* 04-screens-and-navigation.md */,
-			);
-			path = architecture;
 			sourceTree = "<group>";
 		};
 		476947E53005BC4F0098AE9F /* Frameworks */ = {
@@ -100,7 +78,7 @@
 		47F886812FD7ACB3006F2DB6 = {
 			isa = PBXGroup;
 			children = (
-				476939E82FE338FB00F74127 /* CLAUDE.md */,
+				476939E82FE338FB00F74127 /* AGENTS.md */,
 				476939EC2FE338FB00F74127 /* docs */,
 				476939ED2FE338FB00F74127 /* README.md */,
 				47F8868C2FD7ACB3006F2DB6 /* horizon */,

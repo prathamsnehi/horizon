@@ -38,7 +38,7 @@ enum ProfileVocabulary {
 /// thing you do there, and each `subline` has to name **the moment of
 /// friction**, never the reward — a subline that sells the activity
 /// collects right-swipes from people who enjoy the thing, storing the
-/// inverse of what the field means (docs/architecture/02-data-models.md).
+/// inverse of what the field means (see ios/docs/product.md).
 ///
 /// `label` is the only part persisted or sent; the rest is presentation,
 /// kept alongside it so a reordering can't hand a card someone else's line.

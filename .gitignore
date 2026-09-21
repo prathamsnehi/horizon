@@ -48,4 +48,7 @@ yarn-error.log*
 video-originals
 image-originals
 
+# Xcode user-specific state
+**/xcuserdata/
+*.xcuserstate
 

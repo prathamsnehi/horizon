@@ -1,0 +1,462 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		476947E73005BC4F0098AE9F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 476947E63005BC4F0098AE9F /* FirebaseAuth */; };
+		47CCF3B22FF8DD0F001B7F63 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 47CCF3B12FF8DD0F001B7F63 /* FirebaseAppCheck */; };
+		47CCF3B42FF8DD0F001B7F63 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 47CCF3B32FF8DD0F001B7F63 /* FirebaseFunctions */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		476939E82FE338FB00F74127 /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CLAUDE.md; sourceTree = "<group>"; };
+		476939EB2FE338FB00F74127 /* concept.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = concept.md; sourceTree = "<group>"; };
+		476939ED2FE338FB00F74127 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		476939EE2FE3497200F74127 /* 01-overview.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "01-overview.md"; sourceTree = "<group>"; };
+		476939EF2FE3497200F74127 /* 02-data-models.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "02-data-models.md"; sourceTree = "<group>"; };
+		476939F02FE3497200F74127 /* 03-api-contracts.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "03-api-contracts.md"; sourceTree = "<group>"; };
+		476939F12FE3497200F74127 /* 04-screens-and-navigation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "04-screens-and-navigation.md"; sourceTree = "<group>"; };
+		476939F52FE3983E00F74127 /* design.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = design.md; sourceTree = "<group>"; };
+		476939F62FE3B90700F74127 /* milestones.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = milestones.md; sourceTree = "<group>"; };
+		47A047602FF10A1E0078880F /* future-features.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "future-features.md"; sourceTree = "<group>"; };
+		47F8868A2FD7ACB3006F2DB6 /* horizon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = horizon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		47F886972FD7ACB3006F2DB6 /* Exceptions for "horizon" folder in "horizon" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 47F886892FD7ACB3006F2DB6 /* horizon */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		476947E43005BBBC0098AE9F /* developer */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = developer;
+			sourceTree = "<group>";
+		};
+		47F8868C2FD7ACB3006F2DB6 /* horizon */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				47F886972FD7ACB3006F2DB6 /* Exceptions for "horizon" folder in "horizon" target */,
+			);
+			path = horizon;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		47F886872FD7ACB3006F2DB6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				47CCF3B42FF8DD0F001B7F63 /* FirebaseFunctions in Frameworks */,
+				47CCF3B22FF8DD0F001B7F63 /* FirebaseAppCheck in Frameworks */,
+				476947E73005BC4F0098AE9F /* FirebaseAuth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		476939EC2FE338FB00F74127 /* docs */ = {
+			isa = PBXGroup;
+			children = (
+				476947E43005BBBC0098AE9F /* developer */,
+				47A047602FF10A1E0078880F /* future-features.md */,
+				476939F62FE3B90700F74127 /* milestones.md */,
+				476939F52FE3983E00F74127 /* design.md */,
+				476939F32FE3497200F74127 /* architecture */,
+				476939EB2FE338FB00F74127 /* concept.md */,
+			);
+			path = docs;
+			sourceTree = "<group>";
+		};
+		476939F32FE3497200F74127 /* architecture */ = {
+			isa = PBXGroup;
+			children = (
+				476939EE2FE3497200F74127 /* 01-overview.md */,
+				476939EF2FE3497200F74127 /* 02-data-models.md */,
+				476939F02FE3497200F74127 /* 03-api-contracts.md */,
+				476939F12FE3497200F74127 /* 04-screens-and-navigation.md */,
+			);
+			path = architecture;
+			sourceTree = "<group>";
+		};
+		476947E53005BC4F0098AE9F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		47F886812FD7ACB3006F2DB6 = {
+			isa = PBXGroup;
+			children = (
+				476939E82FE338FB00F74127 /* CLAUDE.md */,
+				476939EC2FE338FB00F74127 /* docs */,
+				476939ED2FE338FB00F74127 /* README.md */,
+				47F8868C2FD7ACB3006F2DB6 /* horizon */,
+				476947E53005BC4F0098AE9F /* Frameworks */,
+				47F8868B2FD7ACB3006F2DB6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		47F8868B2FD7ACB3006F2DB6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				47F8868A2FD7ACB3006F2DB6 /* horizon.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		47F886892FD7ACB3006F2DB6 /* horizon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 47F886982FD7ACB3006F2DB6 /* Build configuration list for PBXNativeTarget "horizon" */;
+			buildPhases = (
+				47F886862FD7ACB3006F2DB6 /* Sources */,
+				47F886872FD7ACB3006F2DB6 /* Frameworks */,
+				47F886882FD7ACB3006F2DB6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				47F8868C2FD7ACB3006F2DB6 /* horizon */,
+			);
+			name = horizon;
+			packageProductDependencies = (
+				47CCF3B12FF8DD0F001B7F63 /* FirebaseAppCheck */,
+				47CCF3B32FF8DD0F001B7F63 /* FirebaseFunctions */,
+				476947E63005BC4F0098AE9F /* FirebaseAuth */,
+			);
+			productName = horizon;
+			productReference = 47F8868A2FD7ACB3006F2DB6 /* horizon.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		47F886822FD7ACB3006F2DB6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					47F886892FD7ACB3006F2DB6 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+				};
+			};
+			buildConfigurationList = 47F886852FD7ACB3006F2DB6 /* Build configuration list for PBXProject "horizon" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 47F886812FD7ACB3006F2DB6;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				47CCF3B02FF8DD0F001B7F63 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 47F8868B2FD7ACB3006F2DB6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				47F886892FD7ACB3006F2DB6 /* horizon */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		47F886882FD7ACB3006F2DB6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		47F886862FD7ACB3006F2DB6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		47F886992FD7ACB3006F2DB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = horizon/horizon.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = T296YJXC87;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = horizon/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Horizon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Horizon uses your camera to capture photos of completed quests.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.prathamsnehi.horizonquests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		47F8869A2FD7ACB3006F2DB6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = horizon/horizon.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = T296YJXC87;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = horizon/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Horizon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Horizon uses your camera to capture photos of completed quests.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.prathamsnehi.horizonquests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		47F8869B2FD7ACB3006F2DB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = T296YJXC87;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		47F8869C2FD7ACB3006F2DB6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = T296YJXC87;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		47F886852FD7ACB3006F2DB6 /* Build configuration list for PBXProject "horizon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				47F8869B2FD7ACB3006F2DB6 /* Debug */,
+				47F8869C2FD7ACB3006F2DB6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		47F886982FD7ACB3006F2DB6 /* Build configuration list for PBXNativeTarget "horizon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				47F886992FD7ACB3006F2DB6 /* Debug */,
+				47F8869A2FD7ACB3006F2DB6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		47CCF3B02FF8DD0F001B7F63 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		476947E63005BC4F0098AE9F /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47CCF3B02FF8DD0F001B7F63 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		47CCF3B12FF8DD0F001B7F63 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47CCF3B02FF8DD0F001B7F63 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+		47CCF3B32FF8DD0F001B7F63 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47CCF3B02FF8DD0F001B7F63 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 47F886822FD7ACB3006F2DB6 /* Project object */;
+}

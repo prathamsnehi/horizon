@@ -8,7 +8,7 @@ import {
 import { color, font, layout } from "@/lib/tokens";
 
 /**
- * Scroll-scrubbed showcase. The section is pinned; scroll position drives the
+ * Desktop scroll-scrubbed showcase. The section is pinned; scroll position drives the
  * active clip's playback frame-by-frame (stop scrolling → the frame freezes). Each
  * clip owns a slice of the scroll; crossing into the next flips the row direction
  * so the phone slides to the other side and the text swaps with it (a zigzag,
@@ -55,6 +55,243 @@ const BREATH = 24;
 const STACK_GAP = 28;
 
 export function PhoneShowcase() {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 859px)").matches,
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 859px)");
+    const onChange = () => setMobile(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  return mobile ? <MobilePhoneShowcase /> : <DesktopPhoneShowcase />;
+}
+
+/** All four steps stay in normal document flow on narrow screens. */
+function MobilePhoneShowcase() {
+  const reduce = useReducedMotion() ?? false;
+
+  return (
+    <ol
+      role="list"
+      style={{
+        listStyle: "none",
+        margin: 0,
+        padding: "80px 20px 96px",
+        display: "grid",
+        gap: 88,
+        justifyItems: "center",
+      }}
+    >
+      {SCREENS.map((screen, index) => (
+        <li
+          key={screen.base}
+          style={{
+            width: "100%",
+            maxWidth: 440,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: font.display,
+              fontSize: 12.5,
+              fontWeight: 800,
+              letterSpacing: ".2em",
+              textTransform: "lowercase",
+              color: color.rust,
+              marginBottom: 14,
+            }}
+          >
+            {`SEE IT WORK · 0${index + 1}`}
+          </div>
+          <h2
+            style={{
+              margin: "0 0 16px",
+              fontFamily: font.display,
+              fontSize: "clamp(30px, 4vw, 50px)",
+              fontWeight: 800,
+              letterSpacing: "-.04em",
+              lineHeight: 1,
+              textTransform: "lowercase",
+              color: color.ink,
+            }}
+          >
+            {screen.label}.
+          </h2>
+          <p
+            style={{
+              margin: "0 0 28px",
+              fontSize: "clamp(15px, 1.6vw, 18px)",
+              lineHeight: 1.6,
+              color: color.inkBody,
+            }}
+          >
+            {screen.caption}
+          </p>
+          <MobilePhoneMedia screen={screen} reduce={reduce} eager={index === 0} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Start each clip at normal speed when its phone enters view; pause it off screen. */
+function MobilePhoneMedia({
+  screen,
+  reduce,
+  eager,
+}: {
+  screen: (typeof SCREENS)[number];
+  reduce: boolean;
+  eager: boolean;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [hasEntered, setHasEntered] = useState(false);
+  const [playBlocked, setPlayBlocked] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [firstFrameReady, setFirstFrameReady] = useState(false);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || reduce) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setVisible(entry.isIntersecting);
+        if (entry.isIntersecting) setHasEntered(true);
+      },
+      { threshold: 0.2 },
+    );
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [reduce]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (visible) {
+      void video.play().catch(() => setPlayBlocked(true));
+    } else {
+      video.pause();
+    }
+  }, [visible, hasEntered, reduce, failed]);
+
+  // Keep the same poster element over the video until a decoded frame reaches
+  // the compositor. The video poster alone can disappear before that on mobile.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || firstFrameReady || !video.requestVideoFrameCallback) return;
+    const handle = video.requestVideoFrameCallback(() => setFirstFrameReady(true));
+    return () => video.cancelVideoFrameCallback(handle);
+  }, [hasEntered, reduce, failed, firstFrameReady]);
+
+  const showPoster = reduce || !hasEntered || failed;
+  return (
+    <div
+      ref={frameRef}
+      style={{
+        position: "relative",
+        width: "min(72vw, 280px)",
+        aspectRatio: `${SCREEN_W + 24} / ${SCREEN_H + 24}`,
+        padding: 10,
+        boxSizing: "border-box",
+        borderRadius: 42,
+        background: "linear-gradient(145deg, #2a2622, #0b0907)",
+        boxShadow: "0 28px 48px -24px rgba(38,34,27,.5)",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          borderRadius: 32,
+          overflow: "hidden",
+          background: color.paper,
+        }}
+      >
+        {!showPoster && (
+          <video
+            ref={videoRef}
+            src={`${screen.base}.mp4`}
+            poster={`${screen.base}.jpg`}
+            muted
+            playsInline
+            autoPlay
+            loop
+            preload="auto"
+            controls={false}
+            aria-label={`${screen.label} app demonstration`}
+            onCanPlay={() => {
+              if (visible) void videoRef.current?.play().catch(() => setPlayBlocked(true));
+            }}
+            onLoadedData={() => {
+              if (videoRef.current && !videoRef.current.requestVideoFrameCallback) {
+                setFirstFrameReady(true);
+              }
+            }}
+            onPlaying={() => setPlayBlocked(false)}
+            onError={() => setFailed(true)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        )}
+        {(showPoster || !firstFrameReady) && (
+          <img
+            src={`${screen.base}.jpg`}
+            alt={`${screen.label} screen in Horizon`}
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+        {playBlocked && !showPoster && (
+          <button
+            type="button"
+            onClick={() => void videoRef.current?.play().catch(() => setPlayBlocked(true))}
+            style={{
+              position: "absolute",
+              left: "50%",
+              bottom: 18,
+              transform: "translateX(-50%)",
+              whiteSpace: "nowrap",
+              border: 0,
+              borderRadius: 8,
+              padding: "10px 14px",
+              background: color.ink,
+              color: color.white,
+              fontFamily: font.display,
+              fontWeight: 700,
+            }}
+          >
+            Play demo
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DesktopPhoneShowcase() {
   const reduce = useReducedMotion() ?? false;
   const [vp, setVp] = useState(() => ({
     w: typeof window !== "undefined" ? window.innerWidth : 1200,

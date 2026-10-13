@@ -1,4 +1,5 @@
 # Firebase build and deployment files
+/.evaluation-results/
 /firebase-debug.log
 /firebase-debug.*.log
 

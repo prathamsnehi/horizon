@@ -11,7 +11,7 @@ import {
   buildGenericQuestWriterPrompt,
   buildDescribePlannerPrompt,
 } from "../utils/prompts";
-import { generateObjectWithRouting } from "./router";
+import { generateStructured } from "./router";
 import {
   locationConceptsSchema,
   writerQuestsSchema,
@@ -20,7 +20,7 @@ import {
 } from "./schemas";
 import { recordSpan } from "../observability/tracer";
 import { scrubText } from "../observability/sanitize";
-import { RoutingResult } from "./types";
+import { GenerationContext, RoutingResult } from "./types";
 
 /** Routing provider/model/attempts + failover chain, as trace-span meta. */
 function routingMeta(
@@ -32,6 +32,8 @@ function routingMeta(
     model: result.modelUsed,
     attempts: result.attempts,
     attemptLog: result.attemptLog,
+    capacityWaitMs: result.capacityWaitMs,
+    fallbackReason: result.fallbackReason,
     ...extra,
   };
 }
@@ -43,9 +45,11 @@ export async function generateLocationConcepts(
   profile: UserProfile,
   count: number,
   excludeTitles: string[] = [],
+  context?: GenerationContext,
 ): Promise<LocationConcept[]> {
   const prompt = buildLocationConceptsPrompt(profile, count, excludeTitles);
-  const result = await generateObjectWithRouting("scout", {
+  const result = await generateStructured("scout", {
+    context,
     schema: locationConceptsSchema,
     prompt,
   });
@@ -68,6 +72,7 @@ export async function generateQuestsWriter(
   profile: UserProfile,
   locations: LocationInformation[],
   userIntent?: string,
+  context?: GenerationContext,
 ): Promise<QuestItem[]> {
   // Inject IDs to guarantee we map the exact untouched Maps data back later.
   const locationsWithIds = locations.map((loc, index) => ({
@@ -76,7 +81,8 @@ export async function generateQuestsWriter(
   }));
 
   const prompt = buildQuestWriterPrompt(profile, locationsWithIds, userIntent);
-  const result = await generateObjectWithRouting("writer", {
+  const result = await generateStructured("writer", {
+    context,
     schema: writerQuestsSchema,
     prompt,
   });
@@ -143,6 +149,7 @@ export async function generateGenericQuests(
   excludeTitles: string[] = [],
   userIntent?: string,
   reason?: string,
+  context?: GenerationContext,
 ): Promise<QuestItem[]> {
   if (count <= 0) return [];
 
@@ -152,7 +159,8 @@ export async function generateGenericQuests(
     excludeTitles,
     userIntent,
   );
-  const result = await generateObjectWithRouting("generic", {
+  const result = await generateStructured("generic", {
+    context,
     schema: genericQuestsSchema,
     prompt,
     temperature: 0.8,
@@ -177,14 +185,16 @@ export async function generateGenericQuests(
 /**
  * Pass 0 (Describe Planner): decide whether a user's freeform describe request
  * needs a specific real-world place (location) or is location-agnostic (generic).
- * Uses the fast "scout" model class.
+ * Uses the same gateway as the other stages.
  */
 export async function planDescribedQuest(
   prompt: string,
   profile: UserProfile,
+  context?: GenerationContext,
 ): Promise<DescribePlan> {
   const plannerPrompt = buildDescribePlannerPrompt(prompt, profile);
-  const result = await generateObjectWithRouting("scout", {
+  const result = await generateStructured("planner", {
+    context,
     schema: describePlanSchema,
     prompt: plannerPrompt,
   });
@@ -194,5 +204,5 @@ export async function planDescribedQuest(
     output: { plan: result.object },
     meta: routingMeta(result),
   });
-  return result.object;
+  return { mode: result.object.mode, ...(result.object.textQuery != null ? { textQuery: result.object.textQuery } : {}) };
 }

@@ -35,7 +35,7 @@ service cloud.firestore {
     }
 
     // Everything else stays closed to clients: user_rate_limits, pregen_cache,
-    // llm_rate_buckets and logs are server-only.
+    // ai_gateway_state and logs are server-only.
     match /{document=**} {
       allow read, write: if false;
     }

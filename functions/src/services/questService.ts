@@ -1,3 +1,5 @@
+import { GenerationContext } from "../llm/types";
+import { generationContext, generationSignal } from "../llm/execution";
 import {
   UserProfile,
   QuestItem,
@@ -66,13 +68,15 @@ export function enrichLocations(
 export async function generateBatch(
   profile: UserProfile,
   count: number,
-  excludeTitles: string[] = []
+  excludeTitles: string[] = [],
+  context: GenerationContext = generationContext(),
 ): Promise<QuestItem[]> {
   // --- STEP 1: SCOUT (LLM pass 1 — location concepts) ---
   const locationConcepts = await generateLocationConcepts(
     profile,
     count,
-    excludeTitles
+    excludeTitles,
+    context
   );
   if (locationConcepts.length === 0) {
     throw new Error("Pass 1 failed to generate location concepts.");
@@ -81,7 +85,7 @@ export async function generateBatch(
   // --- STEP 2: LOCATION RESOLUTION (parallel) ---
   const rawMapsResults = await Promise.all(
     locationConcepts.map((concept) =>
-      span("maps.resolve", () => getBestLocation(concept.textQuery), {
+      span("maps.resolve", () => getBestLocation(concept.textQuery, generationSignal(context, 8000)), {
         input: { textQuery: concept.textQuery },
         onResult: (loc) => ({
           output: { resolved: loc },
@@ -110,16 +114,19 @@ export async function generateBatch(
   // --- STEP 4: WRITER (LLM pass 2 — final quests) ---
   const finalQuests: QuestItem[] = [];
   if (enrichedLocations.length > 0) {
-    finalQuests.push(...(await generateQuestsWriter(profile, enrichedLocations)));
+    finalQuests.push(...(await generateQuestsWriter(profile, enrichedLocations, undefined, context)));
   }
 
   // --- STEP 5: GENERIC FALLBACK (deficit filling) ---
   const deficit = count - finalQuests.length;
   if (deficit > 0) {
     const reason = `deficit=${deficit} (writer produced ${finalQuests.length} of ${count}; resolved ${validLocations.length}/${locationConcepts.length} locations)`;
-    finalQuests.push(
-      ...(await generateGenericQuests(profile, deficit, excludeTitles, undefined, reason))
-    );
+    try {
+      finalQuests.push(...(await generateGenericQuests(profile, deficit, excludeTitles, undefined, reason, context)));
+    } catch (error) {
+      if (!finalQuests.length) throw error;
+      recordSpan("generic.partial", { meta: { retained: finalQuests.length, reason: "deficit_fill_failed" } });
+    }
   }
 
   if (finalQuests.length === 0) {
@@ -137,15 +144,16 @@ export async function generateBatch(
  */
 export async function generateDescribed(
   prompt: string,
-  profile: UserProfile
+  profile: UserProfile,
+  context: GenerationContext = generationContext(),
 ): Promise<QuestItem | null> {
-  const plan = await planDescribedQuest(prompt, profile);
+  const plan = await planDescribedQuest(prompt, profile, context);
 
   let genericReason = "plan=generic (planner chose location-agnostic)";
   if (plan.mode === "location" && plan.textQuery) {
     const loc = await span(
       "maps.resolve",
-      () => getBestLocation(plan.textQuery!),
+      () => getBestLocation(plan.textQuery!, generationSignal(context, 8000)),
       {
         input: { textQuery: plan.textQuery },
         onResult: (l) => ({ output: { resolved: l }, meta: { hit: l !== null } }),
@@ -153,7 +161,7 @@ export async function generateDescribed(
     );
     if (loc) {
       const enriched = enrichLocations(profile, [loc]);
-      const items = await generateQuestsWriter(profile, enriched, prompt);
+      const items = await generateQuestsWriter(profile, enriched, prompt, context);
       if (items.length > 0) return items[0];
       genericReason = "writer produced 0 quests for the resolved location";
     } else {
@@ -162,7 +170,7 @@ export async function generateDescribed(
     // Maps/Writer couldn't produce — fall through to a generic quest.
   }
 
-  const generic = await generateGenericQuests(profile, 1, [], prompt, genericReason);
+  const generic = await generateGenericQuests(profile, 1, [], prompt, genericReason, context);
   return generic[0] ?? null;
 }
 

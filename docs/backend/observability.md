@@ -71,3 +71,28 @@ The backend does not receive whether a generated quest was accepted or
 completed. The corpus can reveal generation quality and system health, but it
 cannot measure user outcomes. Any future feedback signal needs an explicit
 privacy design before collection; do not add UID to these samples to obtain it.
+
+## Luna/Groq gateway telemetry
+
+Existing span and `attemptLog` fields remain readable for historical traces.
+Provider names are now `tokenrouter` or `groq`; semantic stages remain Scout,
+planner, Writer, and generic. Failed gateway stages emit an attempt span too,
+so their usage is not lost. Optional attempt fields are `usage` (input/output/
+total tokens), `estimatedCostUsd`, and `unknownUsage`. Missing usage is unknown,
+not zero; estimates use published model rates and are not wallet reconciliation.
+
+Stage metadata adds `capacityWaitMs` and `fallbackReason`. A capacity-triggered
+Groq call can have only one dispatched attempt and still counts as failover.
+Provider error bodies and SDK diagnostics never enter traces; errors are reduced
+to safe status/category codes. Admission/job/reservation IDs, UID, and stable
+profile hashes remain server-only and are not included in trace metadata.
+Temporary provider congestion uses outcome `rate_limited` with a stage reason;
+HTTP callable `unavailable` remains distinct from the daily allowance code.
+The admin cost tile sums priced attempts in loaded samples and identifies
+unpriced attempts, including older traces. Truncation/missing samples and
+unknown-usage failures make it unsuitable as a billing ledger.
+
+Trace persistence is awaited for at most two seconds. A slow/failing write is
+best-effort so it cannot indefinitely hold a completed generation response.
+Pre-generation registration/queueing similarly has a three-second foreground
+budget; a late older registration cannot supersede a newer delivery's job.

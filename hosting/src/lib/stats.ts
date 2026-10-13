@@ -60,6 +60,8 @@ export interface ProviderUsage {
 
 export interface DashboardStats {
   total: number;
+  estimatedCostUsd: number;
+  unpricedAttempts: number;
   byOutcome: Record<TraceOutcome, number>;
   successRate: Ratio;
   errorCount: number;
@@ -74,7 +76,7 @@ export interface DashboardStats {
   mapsResolutionRate: Ratio;
   /** Share of pipeline runs that needed location-free quests to fill a deficit. */
   genericFallbackRate: Ratio;
-  /** Share of LLM calls that took more than one provider attempt. */
+  /** Share of LLM stages that used fallback, including a skipped busy primary. */
   failoverRate: Ratio;
 
   stageLatencies: StageLatency[];
@@ -137,6 +139,8 @@ export function computeStats(
   let mapsLookups = 0;
   let genericRuns = 0;
   let pipelineRuns = 0;
+  let estimatedCostUsd = 0;
+  let unpricedAttempts = 0;
   let llmCalls = 0;
   let llmFailovers = 0;
   const providerCounts = new Map<string, ProviderUsage>();
@@ -163,7 +167,12 @@ export function computeStats(
     for (const stage of LLM_STAGES) {
       for (const span of spansNamed(sample, stage)) {
         llmCalls += 1;
-        if (spanAttemptLog(span).length > 1) llmFailovers += 1;
+        const attempts = spanAttemptLog(span);
+        if (attempts.length > 1 || spanMetaString(span, "fallbackReason")) llmFailovers += 1;
+        for (const attempt of attempts) {
+          if (typeof attempt.estimatedCostUsd === "number" && Number.isFinite(attempt.estimatedCostUsd) && attempt.estimatedCostUsd >= 0) estimatedCostUsd += attempt.estimatedCostUsd;
+          else unpricedAttempts += 1;
+        }
 
         const provider = spanMetaString(span, "provider");
         const model = spanMetaString(span, "model");
@@ -199,6 +208,8 @@ export function computeStats(
 
   return {
     total: samples.length,
+    estimatedCostUsd,
+    unpricedAttempts,
     byOutcome,
     successRate: ratio(byOutcome.success, completed.length),
     errorCount: byOutcome.error,

@@ -94,7 +94,7 @@ USER REQUEST: "${userPrompt}"
 City: ${profile.city}
 
 If fulfilling it requires going to a specific real-world place, set mode="location" and provide a Google Maps "textQuery" (a specific, findable place type that includes the city/region).
-If it can be done at home, online, or anywhere (no specific venue needed), set mode="generic" and omit textQuery.`;
+If it can be done at home, online, or anywhere (no specific venue needed), set mode="generic" and set textQuery to null.`;
 }
 
 /**

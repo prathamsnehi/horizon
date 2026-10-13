@@ -109,8 +109,9 @@ The web application serves three deliberately different surfaces from one
 React/Vite project:
 
 - **`/` — public showcase.** A responsive marketing page uses a scroll-driven
-  iPhone walkthrough, real product media, reduced-motion support, and a focused
-  path from product explanation to TestFlight.
+  iPhone walkthrough on desktop and four normally scrolling, auto-playing video
+  steps below 860px. Posters cover mobile loading, reduced-motion visitors see
+  stills, and the page leads from product explanation to TestFlight.
 - **`/privacy` — product policy.** A lightweight, Firebase-free route explains
   the app and website data boundaries in plain language.
 - **`/admin` — operations console.** A protected dashboard presents generation

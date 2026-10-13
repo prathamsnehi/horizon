@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Zod schemas for the three AI stages. These are portable across providers via
- * the AI SDK's `generateObject` (which enforces + validates structured output),
+ * the AI SDK's `generateText` with `Output.object` (which enforces + validates structured output),
  * replacing the hand-written provider-native JSON schemas.
  */
 
@@ -50,7 +50,7 @@ export const writerQuestsSchema = z.object({
 // Pass 0 (Describe Planner): does the user's freeform prompt need a real place?
 export const describePlanSchema = z.object({
   mode: z.enum(["location", "generic"]),
-  textQuery: z.string().optional(),
+  textQuery: z.string().nullable(),
 });
 
 // Generic fallback: location-agnostic quests (no assignedLocationId).

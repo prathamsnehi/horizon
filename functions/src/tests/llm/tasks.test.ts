@@ -1,13 +1,13 @@
 // Drive the REAL generateQuestsWriter with a mocked router, to verify the
 // server-side verbatim filter on pushesComfortZoneEdges (handoff §3 / criterion 4).
-jest.mock("../../llm/router", () => ({ generateObjectWithRouting: jest.fn() }));
+jest.mock("../../llm/router", () => ({ generateStructured: jest.fn() }));
 jest.mock("../../integrations/firestore", () => ({ saveGenerationSample: jest.fn() }));
 
 import { generateQuestsWriter } from "../../llm/tasks";
-import { generateObjectWithRouting } from "../../llm/router";
+import { generateStructured } from "../../llm/router";
 import { UserProfile, LocationInformation } from "../../types";
 
-const mockRouting = generateObjectWithRouting as jest.Mock;
+const mockRouting = generateStructured as jest.Mock;
 
 const profile: UserProfile = {
   interests: ["coffee"],
@@ -53,7 +53,7 @@ function writerResultWith(pushes: string[]) {
         },
       ],
     },
-    providerUsed: "gemini",
+    providerUsed: "tokenrouter",
     modelUsed: "test",
     attempts: 1,
     latencyMs: 1,

@@ -25,6 +25,9 @@ export interface RoutingAttempt {
   ok: boolean;
   latencyMs: number;
   error?: string;
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+  estimatedCostUsd?: number;
+  unknownUsage?: boolean;
 }
 
 export interface TraceSpan {

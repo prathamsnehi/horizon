@@ -17,8 +17,8 @@ export const RATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 /**
  * Lifetime of an in-flight reservation. MUST be ≥ the function timeout so a
  * still-running generation can't have its pending stamp expire and be double-
- * entered by a concurrent request. Function timeout is 60s; this is 90s (the
- * 30s buffer covers commit-write time + clock skew). A killed run therefore
+ * entered by a concurrent request. Function timeout is 75s; this is 90s (the
+ * 15s buffer covers commit-write time + clock skew). A killed run therefore
  * costs the user at most ~90s, not the full day.
  */
 export const PENDING_TTL_MS = 90_000;
@@ -27,6 +27,7 @@ export interface ReservationEvaluation {
   allowed: boolean;
   /** Epoch-ms when the next attempt becomes allowed (present only when denied). */
   retryAtMs?: number;
+  reason?: "daily_allowance" | "generation_in_progress";
 }
 
 /**
@@ -46,10 +47,10 @@ export function evaluateReservation(
   nowMs: number
 ): ReservationEvaluation {
   if (lastMs != null && nowMs - lastMs < RATE_WINDOW_MS) {
-    return { allowed: false, retryAtMs: lastMs + RATE_WINDOW_MS };
+    return { allowed: false, retryAtMs: lastMs + RATE_WINDOW_MS, reason: "daily_allowance" };
   }
   if (pendingMs != null && nowMs - pendingMs < PENDING_TTL_MS) {
-    return { allowed: false, retryAtMs: pendingMs + PENDING_TTL_MS };
+    return { allowed: false, retryAtMs: pendingMs + PENDING_TTL_MS, reason: "generation_in_progress" };
   }
   return { allowed: true };
 }

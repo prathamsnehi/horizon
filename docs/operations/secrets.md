@@ -8,12 +8,16 @@ deployed function can read only the secrets explicitly attached to it.
 
 | Secret | Purpose |
 | --- | --- |
-| `GEMINI_API_KEY` | Primary model provider |
-| `GROQ_API_KEY` | Model fallback |
-| `MISTRAL_API_KEY` | Model fallback |
-| `CEREBRAS_API_KEY` | Model fallback |
+| `TOKENROUTER_API_KEY` | Luna primary, reasoning disabled |
+| `GROQ_API_KEY` | Independent foreground-only GPT-OSS 120B fallback |
 | `PLACES_API_KEY` | Server-side Google Places search and photo retrieval |
 | `RATE_LIMIT_EXEMPT_UIDS` | Comma-separated development UIDs that skip user generation windows |
+
+Both callables bind TokenRouter, Groq, Places, and the exemption list. The
+background worker binds only TokenRouter and Places. Old Gemini, Mistral, and
+Cerebras cloud secrets are no longer bound; this migration does not delete or
+rotate them. No secret value is printed for testing: load ignored local files
+inside Node or use the evaluation runner's memory-only CLI reader.
 
 The authoritative declarations are in `functions/src/config.ts`. Function-level
 bindings are in the controller definitions.
@@ -23,9 +27,9 @@ bindings are in the controller definitions.
 Run production commands only when explicitly requested:
 
 ```bash
-npx firebase-tools@14 functions:secrets:set RATE_LIMIT_EXEMPT_UIDS --project horizon-sidequests
-npx firebase-tools@14 functions:secrets:access RATE_LIMIT_EXEMPT_UIDS --project horizon-sidequests
-npx firebase-tools@14 functions:secrets:prune --project horizon-sidequests
+firebase functions:secrets:set RATE_LIMIT_EXEMPT_UIDS --project horizon-sidequests
+firebase functions:secrets:access RATE_LIMIT_EXEMPT_UIDS --project horizon-sidequests
+firebase functions:secrets:prune --project horizon-sidequests
 ```
 
 A secret must exist before a non-interactive deployment can bind it. After
@@ -58,3 +62,14 @@ the Firebase project and are intentionally committed. They are not authorization
 credentials. Security comes from Auth, App Check, Firestore rules, and API-key
 restrictions. Browser-key restriction guidance lives in
 [`admin-dashboard.md`](admin-dashboard.md).
+
+## Luna migration rollout
+
+Before an explicitly authorized deployment, provision `TOKENROUTER_API_KEY`,
+verify Luna access and Groq strict output using synthetic inputs, and confirm
+account RPM/concurrency (including traffic from other keys). Current application
+limits live in `functions/src/llm/admission.ts`. The tested account returned a
+15-request/minute ceiling; balance-dependent concurrency is separate. The app
+starts at 12 RPM and three concurrent Luna calls. Estimated spending is visible
+in generation traces/admin; there is no daily spend cap. Existing Firebase CLI
+and tools suffice; notify the user before installing dependencies or tools.

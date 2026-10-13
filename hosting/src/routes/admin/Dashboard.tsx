@@ -144,6 +144,12 @@ export default function Dashboard() {
             />
           </div>
 
+          <StatTile
+            label="Estimated AI cost"
+            value={`$${stats.estimatedCostUsd.toFixed(4)}`}
+            sub={`Usage-priced attempts in loaded samples; ${stats.unpricedAttempts} unpriced. Not reconciled billing.`}
+          />
+
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <RateCard
               label="Maps resolution"
@@ -176,7 +182,7 @@ export default function Dashboard() {
               label="LLM failover"
               ratio={stats.failoverRate}
               fill="bg-s7"
-              note="Calls that took more than one provider"
+              note="Stages that switched to a fallback provider"
             />
           </div>
 

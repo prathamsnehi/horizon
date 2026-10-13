@@ -122,7 +122,7 @@ export interface GetStartedResponse {
 }
 
 // ------------------------------
-// Gemini Orchestration Types (Two-Pass Architecture)
+// Quest Orchestration Types (Two-Pass Architecture)
 // ------------------------------
 
 /**
@@ -134,7 +134,7 @@ export interface LocationConcept {
 }
 
 /**
- * The expected JSON structure returned by Gemini in Pass 1 (Scout)
+ * The expected JSON structure returned by the model in Pass 1 (Scout)
  */
 export interface LocationConceptsResponse {
   locationConcepts: LocationConcept[];
@@ -154,6 +154,8 @@ export interface PregenCacheDocument {
   uid: string;
   nextBatch?: QuestItem[];
   nextBatchHash?: string; // profileHash of nextBatch (invalidates on profile change)
+  batchId?: string;
+  job?: PregenJob;
   nextBatchCreatedAt?: number; // Unix ms, for TTL validation
 }
 
@@ -163,39 +165,16 @@ export interface PregenCacheDocument {
 export interface PregenTaskPayload {
   uid: string;
   profile: UserProfile;
+  jobId: string;
+  profileHash: string;
+  expiresAt: number;
+  excludeTitles: string[];
 }
-
-// ------------------------------
-// Global rate-limiting (Firestore multi-window limiter):
-// ------------------------------
-
-export type RateWindowKind = "rps" | "rpm" | "rpd" | "tpm" | "tpd" | "monthly";
-
-/**
- * "bucket" — smoothing token bucket (good for per-minute limits).
- * "fixed"  — fixed-window counter that resets after `windowMs` (good for hard
- *            daily/monthly caps, which don't refill gradually).
- */
-export type RateWindowStrategy = "bucket" | "fixed";
-
-export interface RateWindowConfig {
-  kind: RateWindowKind;
-  limit: number;
-  windowMs: number;
-  strategy: RateWindowStrategy;
+export interface PregenJob {
+  id: string;
+  profileHash: string;
+  expiresAt: number;
+  status: "pending" | "running" | "ready" | "failed";
+  leaseId?: string;
+  leaseUntil?: number;
 }
-
-export interface BucketWindowState {
-  tokens: number;
-  lastRefillMs: number;
-}
-
-export interface FixedWindowState {
-  count: number;
-  windowStartMs: number;
-}
-
-export type RateWindowState = BucketWindowState | FixedWindowState;
-
-/** A provider's rate state, keyed by window kind (e.g. { rpm: {...}, rpd: {...} }). */
-export type ProviderRateState = Record<string, RateWindowState>;

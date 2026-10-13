@@ -51,7 +51,7 @@ describe("evaluateReservation (two-phase 24h + pending TTL)", () => {
     });
   });
 
-  it("PENDING_TTL_MS is ≥ the 60s function timeout", () => {
-    expect(PENDING_TTL_MS).toBeGreaterThanOrEqual(60_000);
+  it("PENDING_TTL_MS is ≥ the 75s function timeout", () => {
+    expect(PENDING_TTL_MS).toBeGreaterThanOrEqual(75_000);
   });
 });

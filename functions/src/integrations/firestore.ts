@@ -1,3 +1,5 @@
+import { withinTimeout } from "../utils/timeout";
+import { randomUUID } from "node:crypto";
 import { getApps, initializeApp, App } from "firebase-admin/app";
 import {
   getFirestore,
@@ -6,14 +8,12 @@ import {
   FieldValue,
 } from "firebase-admin/firestore";
 import {
-  RateWindowConfig,
-  ProviderRateState,
-  RateWindowState,
   PregenCacheDocument,
   QuestItem,
+  PregenTaskPayload,
+  PregenJob,
 } from "../types";
-import { advanceWindow, consumeWindow } from "../llm/rateMath";
-import { evaluateReservation } from "../utils/rateLimit";
+import { evaluateReservation, PENDING_TTL_MS } from "../utils/rateLimit";
 import { BATCH_TTL_MS, rateLimitExemptUids } from "../config";
 
 /**
@@ -27,7 +27,7 @@ import { BATCH_TTL_MS, rateLimitExemptUids } from "../config";
 const app: App = getApps().length ? getApps()[0]! : initializeApp();
 let db: Firestore | null = null;
 
-function getDb(): Firestore {
+export function getDb(): Firestore {
   if (!db) {
     db = getFirestore(app);
   }
@@ -47,8 +47,8 @@ const GENERATION_SAMPLES_COLLECTION = "generation_samples";
 
 /**
  * Persist one end-to-end trace document (built by the tracer). Awaited by the
- * tracer at request end, so it's a single write that lands before the container
- * can freeze. Never throws — a tracing failure must not affect the request.
+ * tracer at request end with a two-second wait budget. Never throws — a
+ * tracing failure must not affect the request.
  * Takes a plain object to avoid a type cycle with the tracer module.
  */
 export async function saveGenerationSample(doc: Record<string, unknown>): Promise<void> {
@@ -56,124 +56,9 @@ export async function saveGenerationSample(doc: Record<string, unknown>): Promis
     // A JSON round-trip strips `undefined` (which Firestore rejects) and any
     // non-plain values from the arbitrary captured input/output objects.
     const safe = JSON.parse(JSON.stringify(doc));
-    await getDb().collection(GENERATION_SAMPLES_COLLECTION).add(safe);
-  } catch (err) {
-    console.error("[saveGenerationSample] Failed to persist sample:", err);
-  }
-}
-
-// ------------------------------
-// Global rate distribution (llm_rate_buckets/global)
-// ------------------------------
-
-const RATE_BUCKET_DOC = "llm_rate_buckets/global";
-
-/**
- * Reserve capacity for one AI call and return the candidate rate-keys reordered
- * so the one with the most available quota is tried first. Keys are per model
- * (`${provider}:${model}`) since limits are metered per model. Runs a single
- * Firestore transaction implementing a multi-window limiter: refills token
- * buckets by elapsed time, rolls fixed daily counters, and a model is eligible
- * only if ALL its windows have headroom. Decrements every window of the chosen
- * model.
- *
- * Fails open: on any error it returns the input order unchanged, so a Firestore
- * hiccup never blocks generation.
- */
-export async function reserveLlmToken(
-  candidateKeys: string[],
-  limits: Record<string, RateWindowConfig[]>
-): Promise<string[]> {
-  try {
-    const ref = getDb().doc(RATE_BUCKET_DOC);
-    const now = Date.now();
-
-    return await getDb().runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const data: Record<string, ProviderRateState> = snap.exists
-        ? (snap.data() as Record<string, ProviderRateState>)
-        : {};
-
-      const headroom: Record<string, number> = {};
-      const eligible: string[] = [];
-
-      for (const key of candidateKeys) {
-        const windows = limits[key] ?? [];
-        const state: ProviderRateState = { ...(data[key] ?? {}) };
-        let modelEligible = true;
-        let minNormalized = 1; // normalized 0..1 headroom of the scarcest window
-
-        for (const w of windows) {
-          const advanced = advanceWindow(w, state[w.kind], now);
-          state[w.kind] = advanced.state;
-          if (!advanced.hasHeadroom) modelEligible = false;
-          minNormalized = Math.min(minNormalized, advanced.remaining / w.limit);
-        }
-
-        data[key] = state;
-        headroom[key] = windows.length ? minNormalized : 1;
-        if (modelEligible) eligible.push(key);
-      }
-
-      // Choose the eligible model with the most scarce-window headroom.
-      let chosen: string | null = null;
-      if (eligible.length) {
-        chosen = eligible.reduce(
-          (best, key) => (headroom[key] > headroom[best] ? key : best),
-          eligible[0]
-        );
-        const windows = limits[chosen] ?? [];
-        const state = data[chosen];
-        for (const w of windows) {
-          state[w.kind] = consumeWindow(w, state[w.kind] as RateWindowState);
-        }
-        data[chosen] = state;
-      }
-
-      tx.set(ref, data);
-
-      // Chosen first; remaining candidates by descending headroom.
-      const rest = candidateKeys.filter((key) => key !== chosen);
-      rest.sort((a, b) => (headroom[b] ?? 0) - (headroom[a] ?? 0));
-      return chosen ? [chosen, ...rest] : candidateKeys;
-    });
-  } catch (err) {
-    console.error("[reserveLlmToken] failing open to static order:", err);
-    return candidateKeys;
-  }
-}
-
-/**
- * Drain a model's windows after an observed 429 / failure, so routing avoids it
- * until the window recovers. `rateKey` is `${provider}:${model}`. Best-effort;
- * never throws. This is also the backstop for token-based (TPM/TPD) limits we
- * don't model explicitly.
- */
-export async function penalizeRateKey(rateKey: string): Promise<void> {
-  try {
-    const ref = getDb().doc(RATE_BUCKET_DOC);
-    await getDb().runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      if (!snap.exists) return;
-      const data = snap.data() as Record<string, ProviderRateState>;
-      const state = data[rateKey];
-      if (!state) return;
-
-      for (const kind of Object.keys(state)) {
-        const s = state[kind] as RateWindowState;
-        if ("tokens" in s) {
-          s.tokens = 0;
-        } else {
-          // Exhaust the fixed window until it rolls over.
-          s.count = Number.MAX_SAFE_INTEGER;
-        }
-      }
-
-      data[rateKey] = state;
-      tx.set(ref, data);
-    });
-  } catch (err) {
-    console.error("[penalizeRateKey] failed:", err);
+    await withinTimeout(getDb().collection(GENERATION_SAMPLES_COLLECTION).add(safe), 2000);
+  } catch {
+    console.warn("[saveGenerationSample] persistence unavailable");
   }
 }
 
@@ -197,45 +82,48 @@ export async function getPregenCache(
   return snap.exists ? (snap.data() as PregenCacheDocument) : null;
 }
 
-/** Store a background pre-generated batch ready to serve next. */
-export async function savePregeneratedBatch(
-  uid: string,
-  batch: QuestItem[],
-  profileHash: string,
-  createdAt: number = Date.now()
-): Promise<void> {
-  await getDb()
-    .collection(PREGEN_CACHE_COLLECTION)
-    .doc(uid)
-    .set(
-      {
-        uid,
-        nextBatch: batch,
-        nextBatchHash: profileHash,
-        nextBatchCreatedAt: createdAt,
-        expireAt: Timestamp.fromMillis(createdAt + BATCH_TTL_MS), // for the sake of native firestore TTL
-      },
-      { merge: true }
-    );
+/** Register the newest job without discarding a concurrently written cache. */
+export async function registerPregenJob(payload: PregenTaskPayload): Promise<void> {
+  const job: PregenJob = { id: payload.jobId, profileHash: payload.profileHash, expiresAt: payload.expiresAt, status: "pending" };
+  const ref = getDb().collection(PREGEN_CACHE_COLLECTION).doc(payload.uid);
+  await getDb().runTransaction(async tx => {
+    const existing = await tx.get(ref);
+    // A timed-out older enqueue must not register over a newer delivery's job.
+    if ((existing.data()?.job?.expiresAt ?? 0) > payload.expiresAt) return;
+    tx.set(ref, { uid: payload.uid, job, expireAt: Timestamp.fromMillis(Date.now() + BATCH_TTL_MS) }, { merge: true });
+  });
 }
 
-/**
- * Invalidate a user's cached batch after it's been served, so a failed
- * re-generation can't serve the same batch twice.
- */
-export async function clearPregenBatch(uid: string): Promise<void> {
-  await getDb()
-    .collection(PREGEN_CACHE_COLLECTION)
-    .doc(uid)
-    .set(
-      {
-        uid,
-        nextBatch: null,
-        nextBatchHash: null,
-        nextBatchCreatedAt: null,
-      },
-      { merge: true }
-    );
+export async function claimPregenJob(payload: PregenTaskPayload): Promise<{ status: "claimed"; leaseId: string } | { status: "skip" } | { status: "busy" }> {
+  const ref = getDb().collection(PREGEN_CACHE_COLLECTION).doc(payload.uid);
+  const leaseId = randomUUID();
+  return getDb().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const job = snap.data()?.job as PregenJob | undefined;
+    const now = Date.now();
+    if (!job || job.id !== payload.jobId || job.profileHash !== payload.profileHash || job.expiresAt <= now || ["ready", "failed"].includes(job.status)) return { status: "skip" as const };
+    if (job.status === "running" && (job.leaseUntil ?? 0) > now) return { status: "busy" as const };
+    tx.set(ref, { job: { ...job, status: "running", leaseId, leaseUntil: now + 90_000 } }, { merge: true });
+    return { status: "claimed" as const, leaseId };
+  });
+}
+
+/** Only the newest job's current worker may publish or update its status. */
+export async function finishPregenJob(payload: PregenTaskPayload, leaseId: string, outcome: "ready" | "pending" | "failed", batch?: QuestItem[]): Promise<boolean> {
+  const ref = getDb().collection(PREGEN_CACHE_COLLECTION).doc(payload.uid);
+  return getDb().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const job = snap.data()?.job as PregenJob | undefined;
+    const now = Date.now();
+    if (!job || job.id !== payload.jobId || job.leaseId !== leaseId || (job.leaseUntil ?? 0) <= now || job.expiresAt <= now) return false;
+    const update: Record<string, unknown> = { job: { ...job, status: outcome, leaseId: FieldValue.delete(), leaseUntil: FieldValue.delete() } };
+    if (outcome === "ready" && batch?.length) Object.assign(update, {
+      nextBatch: batch, nextBatchHash: payload.profileHash, nextBatchCreatedAt: now,
+      batchId: payload.jobId, expireAt: Timestamp.fromMillis(now + BATCH_TTL_MS),
+    });
+    tx.set(ref, update, { merge: true });
+    return true;
+  });
 }
 
 // ------------------------------
@@ -281,6 +169,8 @@ export interface RateReservation {
   allowed: boolean;
   /** ISO8601 of when the next attempt is allowed (present only when denied). */
   retryAt?: string;
+  reason?: "daily_allowance" | "generation_in_progress";
+  reservationId?: string;
 }
 
 /**
@@ -303,23 +193,24 @@ export async function reserveRateLimitSlot(
   const ref = getDb().collection(RATE_LIMITS_COLLECTION).doc(uid);
   const lastField = lastFieldFor(action);
   const pendingField = pendingFieldFor(action);
-  const nowMs = Date.now();
+  const reservationId = randomUUID();
   return getDb().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() : undefined;
     const lastTs = data?.[lastField] as Timestamp | undefined;
     const pendingTs = data?.[pendingField] as Timestamp | undefined;
 
+    const nowMs = Date.now();
     const result = evaluateReservation(
       lastTs ? lastTs.toMillis() : null,
       pendingTs ? pendingTs.toMillis() : null,
       nowMs
     );
     if (!result.allowed) {
-      return { allowed: false, retryAt: new Date(result.retryAtMs!).toISOString() };
+      return { allowed: false, retryAt: new Date(result.retryAtMs!).toISOString(), reason: result.reason };
     }
-    tx.set(ref, { [pendingField]: Timestamp.fromMillis(nowMs) }, { merge: true });
-    return { allowed: true };
+    tx.set(ref, { [pendingField]: Timestamp.fromMillis(nowMs), [pendingField + "Id"]: reservationId }, { merge: true });
+    return { allowed: true, reservationId };
   });
 }
 
@@ -329,44 +220,41 @@ export async function reserveRateLimitSlot(
  * only once the quests are about to be returned to the client.
  */
 export async function commitRateLimitSlot(
-  uid: string,
-  action: RateAction
+  uid: string, action: RateAction, reservationId?: string,
+  cachedBatch?: { batchId?: string; nextBatchCreatedAt?: number },
 ): Promise<void> {
-  // No durable stamp for an exempt uid, so its 24h window never opens.
-  if (isRateLimitExempt(uid)) return;
-
-  await getDb()
-    .collection(RATE_LIMITS_COLLECTION)
-    .doc(uid)
-    .set(
-      {
-        [lastFieldFor(action)]: Timestamp.now(),
-        [pendingFieldFor(action)]: FieldValue.delete(),
-      },
-      { merge: true }
-    );
+  const exempt = isRateLimitExempt(uid);
+  if (exempt && !cachedBatch) return;
+  const ref = getDb().collection(RATE_LIMITS_COLLECTION).doc(uid);
+  const cacheRef = getDb().collection(PREGEN_CACHE_COLLECTION).doc(uid);
+  await getDb().runTransaction(async tx => {
+    const user = exempt ? undefined : await tx.get(ref);
+    const cache = cachedBatch ? await tx.get(cacheRef) : undefined;
+    const pending = pendingFieldFor(action);
+    const pendingAt = user?.data()?.[pending] as Timestamp | undefined;
+    if (!exempt && (!reservationId || user?.data()?.[pending + "Id"] !== reservationId || !pendingAt || Date.now() - pendingAt.toMillis() >= PENDING_TTL_MS)) {
+      throw new Error("generation_reservation_expired");
+    }
+    if (!exempt) tx.set(ref, {
+      [lastFieldFor(action)]: Timestamp.now(), [pending]: FieldValue.delete(), [pending + "Id"]: FieldValue.delete(),
+    }, { merge: true });
+    if (cachedBatch && cache?.exists && cache.data()?.batchId === cachedBatch.batchId && cache.data()?.nextBatchCreatedAt === cachedBatch.nextBatchCreatedAt) {
+      tx.set(cacheRef, { nextBatch: FieldValue.delete(), nextBatchHash: FieldValue.delete(), nextBatchCreatedAt: FieldValue.delete(), batchId: FieldValue.delete() }, { merge: true });
+    }
+  });
 }
 
-/**
- * Phase 2 (failure): best-effort clear of the pending stamp so a failed run
- * frees the slot immediately. If the process dies before this runs, the pending
- * stamp self-expires within PENDING_TTL_MS instead. Never throws.
- */
-export async function releaseRateLimitSlot(
-  uid: string,
-  action: RateAction
-): Promise<void> {
-  // An exempt uid never wrote a pending stamp, so there's nothing to release.
-  if (isRateLimitExempt(uid)) return;
-
+/** Release only the reservation held by this invocation. */
+export async function releaseRateLimitSlot(uid: string, action: RateAction, reservationId?: string): Promise<void> {
+  if (!reservationId || isRateLimitExempt(uid)) return;
   try {
-    await getDb()
-      .collection(RATE_LIMITS_COLLECTION)
-      .doc(uid)
-      .set({ [pendingFieldFor(action)]: FieldValue.delete() }, { merge: true });
-  } catch (err) {
-    console.error("[releaseRateLimitSlot] failed:", err);
-  }
+    const ref = getDb().collection(RATE_LIMITS_COLLECTION).doc(uid);
+    const pending = pendingFieldFor(action);
+    await getDb().runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (snap.data()?.[pending + "Id"] === reservationId) tx.set(ref, { [pending]: FieldValue.delete(), [pending + "Id"]: FieldValue.delete() }, { merge: true });
+    });
+  } catch { console.warn("[releaseRateLimitSlot] unavailable; reservation will expire"); }
 }
 
 // ------------------------------

@@ -23,7 +23,7 @@ canonical document in the same change rather than adding another copy.
   `HttpsError` mapping.
 - `src/services/`: framework-light quest orchestration.
 - `src/integrations/`: Firestore and Google Places access.
-- `src/llm/`: model registry, rate-aware routing, schemas, and LLM tasks.
+- `src/llm/`: fixed Luna/Groq gateway, shared admission policy, schemas, and LLM tasks.
 - `src/observability/`: request-scoped tracing and de-identification.
 - `src/utils/`: pure validation, hashing, distance, prompt, and rate-limit logic.
 - `src/index.ts`: the complete deployed export surface.
@@ -65,9 +65,12 @@ manual deploy or change cloud configuration unless the user explicitly asks.
   photo bytes; base64 photos are attached best-effort to the response only.
 - Preserve partial success. Missing Places results or a short Writer result are
   filled with generic quests; a failed photo fetch omits the image.
-- The LLM quota store fails open to static candidate order. Provider SDK retries
-  stay disabled so router failover, rather than a hidden retry loop, handles
-  transient/provider failures.
+- Provider admission fails closed and is shared across all instances. Luna is
+  primary with reasoning disabled; Groq is foreground-only fallback for capacity
+  or transient failures. SDK retries stay disabled. Background jobs defer via
+  Cloud Tasks and may publish only while owning the newest job's worker lease.
+- Daily reservation commit/release must match the owning reservation ID. Keep
+  the 60s generation deadline below the 75s function timeout and 90s pending TTL.
 - Secrets are `defineSecret` values and must also appear in every consuming
   function's `secrets` option. Never add keys or exemption UIDs to source files.
 - `generation_samples` is de-identified but still sensitive. Never record UID,

@@ -12,9 +12,11 @@ jest.mock("../../config", () => ({
 
 const txSet = jest.fn();
 const docSet = jest.fn().mockResolvedValue(undefined);
-const runTransaction = jest.fn(async (fn: any) =>
-  fn({ get: async () => ({ exists: false, data: () => undefined }), set: txSet })
-);
+let stored: any;
+const runTransaction = jest.fn(async (fn: any) => fn({
+  get: async () => ({ exists: !!stored, data: () => stored }),
+  set: (_ref: any, data: any) => { stored = { ...stored, ...data }; txSet(_ref, data); },
+}));
 
 jest.mock("firebase-admin/app", () => ({
   getApps: () => [{}],
@@ -41,6 +43,7 @@ const NORMAL = "someone-else";
 
 describe("rate-limit exemption", () => {
   beforeEach(() => {
+    stored = undefined;
     txSet.mockClear();
     docSet.mockClear();
     runTransaction.mockClear();
@@ -57,8 +60,10 @@ describe("rate-limit exemption", () => {
     });
 
     it("writes the durable stamp on commit", async () => {
-      await commitRateLimitSlot(NORMAL, "curated");
-      expect(docSet).toHaveBeenCalledTimes(1);
+      const reservation = await reserveRateLimitSlot(NORMAL, "curated");
+      txSet.mockClear();
+      await commitRateLimitSlot(NORMAL, "curated", reservation.reservationId);
+      expect(txSet).toHaveBeenCalledTimes(1);
     });
   });
 

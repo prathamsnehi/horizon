@@ -217,3 +217,13 @@ describe("failingStage", () => {
     expect(failingStage(sample({ spans: [] }))).toBeUndefined();
   });
 });
+
+it("counts capacity-triggered fallback and prices only attempts with known usage", () => {
+  const rows = [sample({ spans: [span("writer", { meta: {
+    fallbackReason: "luna_capacity", provider: "groq", model: "openai/gpt-oss-120b",
+    attemptLog: [{ provider: "groq", model: "openai/gpt-oss-120b", ok: true, latencyMs: 10, estimatedCostUsd: 0.001 }],
+  } }), span("planner", { meta: { attemptLog: [{ provider: "gemini", model: "historical", ok: false, latencyMs: 1 }] } })] })];
+  const stats = computeStats(rows, NOW, 24 * HOUR);
+  expect(stats.estimatedCostUsd).toBe(0.001); expect(stats.unpricedAttempts).toBe(1);
+  expect(stats.failoverRate.hits).toBe(1);
+});

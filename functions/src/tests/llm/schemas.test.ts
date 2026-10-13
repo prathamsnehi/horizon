@@ -1,4 +1,5 @@
 import {
+  describePlanSchema,
   locationConceptsSchema,
   writerQuestsSchema,
   genericQuestsSchema,
@@ -82,4 +83,9 @@ describe("genericQuestsSchema", () => {
     });
     expect(parsed.quests).toHaveLength(1);
   });
+});
+
+it("planner requires nullable textQuery, normalized before Maps", () => {
+  expect(describePlanSchema.parse({ mode: "generic", textQuery: null })).toEqual({ mode: "generic", textQuery: null });
+  expect(() => describePlanSchema.parse({ mode: "generic" })).toThrow();
 });

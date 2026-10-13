@@ -108,10 +108,12 @@ render however many quests are returned; partial location resolution can yield
 fewer location-backed quests and generic quests fill the remaining capacity.
 
 The endpoint checks `pregen_cache/{uid}` for a next batch built for the exact
-profile. A usable batch must match the profile hash and be younger than 60 days.
+profile. A usable batch must match the profile hash, be younger than 60 days, and contain
+no title in the current exclusions (trimmed, case-insensitive comparison).
 On a hit, it is consumed; on a miss, the batch is generated synchronously. In
-both cases the consumed cache entry is cleared and a best-effort Cloud Task is
-enqueued. That task—not the serving request—stores the following reference-only
+both cases delivery commits before a best-effort Cloud Task is enqueued. Cache
+consumption and the daily stamp commit together; only the batch version read is
+cleared, preserving a concurrently written newer batch. That task—not the serving request—stores the following reference-only
 batch. Photo bytes are fetched only while serving and are never cached in
 Firestore.
 
@@ -151,7 +153,8 @@ details? }`.
 | --- | --- |
 | `unauthenticated` | The Firebase Auth token is missing. Backend message: `Sign in to generate quests.` The normal iOS path establishes anonymous auth first, so treat this as a session/server error. |
 | `invalid-argument` | Payload validation failed or a described prompt was blocked. The message is suitable for the client error surface. |
-| `resource-exhausted` | The daily lane is spent or a generation is already pending. `details` is `{ retryAt: <ISO8601>, scope: "curated" | "described" }`. |
+| `resource-exhausted` | Only the genuine rolling 24-hour allowance. `details` is `{ retryAt: <ISO8601>, scope: "curated" | "described", reason: "daily_allowance" }`. Reconcile the local daily gate. |
+| `unavailable` | Temporary provider capacity/outage, coordination failure, generation deadline, or an in-progress generation. `details` contains `reason` and optionally ISO8601 `retryAt`; in-progress allowance checks also include the lane `scope`. Show a retry message; do not update the local daily timestamp. |
 | `internal` | Generation failed downstream. The durable daily slot is not consumed; the pending reservation is released best-effort or expires. |
 
 Network loss and the client's 90-second transport timeout are client-side error
@@ -162,9 +165,11 @@ states, not additional function codes.
 The two endpoints have independent rolling 24-hour windows keyed by the verified
 `request.auth.uid`. State lives in `user_rate_limits/{uid}` and uses server time.
 
-1. A Firestore transaction writes a lane-specific pending stamp before spend.
+1. A Firestore transaction writes a lane-specific pending stamp and owner ID before spend.
 2. A fresh pending stamp blocks concurrent work for up to 90 seconds.
-3. Successful delivery writes the durable stamp and clears the pending stamp.
+3. Successful delivery writes the durable stamp and clears the pending stamp only
+   when the owner ID still matches. Stale requests cannot commit or release newer
+   reservations.
 4. Failure clears the pending stamp best-effort; process death leaves only the
    self-expiring pending stamp, never a burned daily window.
 
@@ -181,3 +186,10 @@ pipeline is documented in [`../backend/architecture.md`](../backend/architecture
 `GetStartedRequest` and `GetStartedResponse` types exist in TypeScript, but no
 `generateGetStartedGuide` function is exported. The iOS UI therefore presents
 Get Started as deferred behavior and must not call that endpoint.
+
+Provider admission is independent of the daily product allowance and applies to
+developer-exempt accounts as well. Luna is primary and Groq is foreground-only
+fallback. AI/Places stages share a 60-second generation deadline; functions have
+75-second timeouts and the client retains its 90-second transport timeout.
+If generic deficit filling fails after valid Writer quests exist, the endpoint
+returns those quests as a successful partial batch. No quest payload changed.

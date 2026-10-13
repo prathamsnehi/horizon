@@ -1,7 +1,6 @@
 /**
  * Public API of the provider-agnostic LLM layer. The controller imports the
- * three task functions from here; internally they route across providers with
- * global rate-aware distribution + failover.
+ * four task functions from here; internally they use Luna with shared admission and a foreground-only Groq fallback.
  */
 export {
   generateLocationConcepts,

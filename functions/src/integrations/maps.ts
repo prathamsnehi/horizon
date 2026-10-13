@@ -5,9 +5,10 @@ import { isValidPhotoReference } from "../utils/validation";
 /**
  * Helper to fetch places from Google Maps API
  */
-async function fetchPlaces(queryText: string, maxResults = 10) {
+async function fetchPlaces(queryText: string, maxResults = 10, signal: AbortSignal = AbortSignal.timeout(8000)) {
   const response = await fetch(PLACES_API_BASE_URL, {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": placesApiKey.value(),
@@ -63,8 +64,11 @@ const SELECTION_POOL_SIZE = 5;
  */
 export async function getBestLocation(
   queryText: string,
+  signal?: AbortSignal,
 ): Promise<LocationInformation | null> {
-  const places = await fetchPlaces(queryText, 10);
+  let places;
+  try { places = await fetchPlaces(queryText, 10, signal); }
+  catch { return null; }
 
   const openPlaces = places.filter(
     (p: any) =>
@@ -98,7 +102,7 @@ export async function fetchPlacePhotoBytes(
   const url = `https://places.googleapis.com/v1/${photoReference}/media?key=${placesApiKey.value()}&maxHeightPx=600`;
 
   try {
-    const res = await fetch(url); // follows the redirect to the image bytes
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) }); // follows the redirect to the image bytes
     if (!res.ok) {
       console.error(`Place Photo Error: ${res.status} ${res.statusText}`);
       return null;
@@ -107,7 +111,7 @@ export async function fetchPlacePhotoBytes(
     const buffer = Buffer.from(await res.arrayBuffer());
     return { base64: buffer.toString("base64"), contentType, bytes: buffer.length };
   } catch (err) {
-    console.error("[fetchPlacePhotoBytes] failed:", err);
+    console.warn("[fetchPlacePhotoBytes] unavailable");
     return null;
   }
 }

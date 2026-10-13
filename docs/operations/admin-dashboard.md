@@ -107,3 +107,12 @@ signed-out, unauthorized, and authorized states; load each admin route; filter
 logs by type and outcome; and open a trace detail. Hosting deploys automatically
 on pushes to `main` that touch `hosting/**` or `firebase.json`; pull requests
 from this repository receive Firebase preview channels.
+
+## Estimated AI spending
+
+The pipeline dashboard shows estimated AI cost for attempts in its loaded
+sample window, plus unpriced attempt count. It uses backend-provided per-attempt
+prices/usage, includes failed attempts with known usage, and preserves historical
+traces without new fields. Capacity-triggered Groq fallback counts even when
+Luna was not dispatched. This is monitoring, without budget enforcement, and
+not reconciled billing; incomplete samples and unknown usage can undercount.

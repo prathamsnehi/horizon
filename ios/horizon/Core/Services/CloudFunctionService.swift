@@ -107,6 +107,7 @@ enum CloudFunctionError: LocalizedError {
     case serverError(String)
     case malformedResponse
     case rateLimited(retryAt: Date?) // User already generated: gate opens again @ retryAt: Date?
+    case temporarilyUnavailable(message: String, retryAt: Date?)
     case timedOut // Server timeout, not user's fault (no penalize, only make wait for ~1.5 min)
 
     var errorDescription: String? {
@@ -121,6 +122,8 @@ enum CloudFunctionError: LocalizedError {
             "Received an unexpected response. Please try again."
         case .rateLimited:
             "You've used today's quest. Come back tomorrow."
+        case .temporarilyUnavailable(let message, _):
+            message.isEmpty ? "Generation is temporarily busy. Please try again shortly — your daily quest wasn't used." : message
         case .timedOut:
             "Generation took too long. Give it a minute or two and try again — your daily quest wasn't used."
         }
@@ -175,7 +178,7 @@ final class CloudFunctionService {
         }
 
         var callable: Callable<Request, Response> = functions.httpsCallable(name)
-        // Margin above the functions' own 60s timeout, so a slow-but-
+        // Margin above the functions' own 75s timeout, so a slow-but-
         // successful generation is never abandoned client-side.
         callable.timeoutInterval = 90
         do {
@@ -210,6 +213,7 @@ final class CloudFunctionService {
             switch FunctionsErrorCode(rawValue: nsError.code) {
             case .invalidArgument: return .invalidArgument(message)
             case .resourceExhausted: return .rateLimited(retryAt: retryAt(from: nsError))
+            case .unavailable: return .temporarilyUnavailable(message: message, retryAt: retryAt(from: nsError))
             case .deadlineExceeded: return .timedOut
             default: return .serverError(message)
             }

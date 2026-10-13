@@ -8,18 +8,16 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "jest"
+    "test": "jest",
+    "evaluate:quests": "node lib/evaluation/runner.js"
   },
   "engines": {
     "node": "22"
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@ai-sdk/cerebras": "^3.0.2",
-    "@ai-sdk/google": "^4.0.3",
     "@ai-sdk/groq": "^4.0.2",
-    "@ai-sdk/mistral": "^4.0.2",
-    "@google/genai": "^2.10.0",
+    "@ai-sdk/openai-compatible": "3.0.2",
     "ai": "^7.0.9",
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^7.0.0",

@@ -1,3 +1,6 @@
+import { withinTimeout } from "../utils/timeout";
+import { randomUUID } from "node:crypto";
+import { generationContext, GenerationUnavailable } from "../llm/execution";
 import * as functions from "firebase-functions/v2";
 import { getFunctions } from "firebase-admin/functions";
 import {
@@ -21,7 +24,7 @@ import {
 } from "../utils/validation";
 import {
   getPregenCache,
-  clearPregenBatch,
+  registerPregenJob,
   reserveRateLimitSlot,
   commitRateLimitSlot,
   releaseRateLimitSlot,
@@ -29,11 +32,9 @@ import {
 import { runTrace, span, recordSpan, setTraceField } from "../observability/tracer";
 import { sanitizeProfile, scrubText } from "../observability/sanitize";
 import {
-  geminiApiKey,
+  tokenrouterApiKey,
   placesApiKey,
   groqApiKey,
-  mistralApiKey,
-  cerebrasApiKey,
   rateLimitExemptUids,
   CURATED_BATCH_SIZE,
   BATCH_TTL_MS,
@@ -41,11 +42,9 @@ import {
 } from "../config";
 
 const LLM_SECRETS = [
-  geminiApiKey,
+  tokenrouterApiKey,
   placesApiKey,
   groqApiKey,
-  mistralApiKey,
-  cerebrasApiKey,
 ];
 
 // Both callables enforce the 24h limit, so they also need the exempt-uid
@@ -76,10 +75,26 @@ function isDescribePromptAllowed(prompt: string): boolean {
 /** Best-effort enqueue of the background next-batch pre-generation task. */
 async function enqueuePregen(payload: PregenTaskPayload): Promise<void> {
   try {
-    await getFunctions().taskQueue(PREGEN_TASK_NAME).enqueue(payload);
-  } catch (err) {
-    console.error("[enqueuePregen] failed (next batch will be a sync miss):", err);
+    await withinTimeout((async () => {
+      await registerPregenJob(payload);
+      await getFunctions().taskQueue(PREGEN_TASK_NAME).enqueue(payload, { dispatchDeadlineSeconds: 75 });
+    })(), 3000);
+  } catch {
+    console.warn("[enqueuePregen] unavailable; next request can generate synchronously");
   }
+}
+
+/** Safe public errors: upstream bodies/credentials never cross the callable. */
+function generationError(error: unknown): functions.https.HttpsError {
+  if (error instanceof GenerationUnavailable) {
+    setTraceField({ outcome: "rate_limited" });
+    return new functions.https.HttpsError("unavailable", error.message,
+      { reason: error.reason, retryAt: new Date(error.retryAtMs).toISOString() });
+  }
+  if ((error as Error)?.message === "generation_reservation_expired") {
+    return new functions.https.HttpsError("unavailable", "Please try generating again shortly.", { reason: "generation_in_progress" });
+  }
+  return new functions.https.HttpsError("internal", "Generation failed. Please try again — your daily quest wasn't used.");
 }
 
 /**
@@ -91,7 +106,7 @@ async function enqueuePregen(payload: PregenTaskPayload): Promise<void> {
  * (CURATED_BATCH_SIZE); the request carries only { profile, excludeTitles? }.
  */
 export const generateCuratedQuests = functions.https.onCall(
-  { enforceAppCheck: true, secrets: CALLABLE_SECRETS },
+  { enforceAppCheck: true, secrets: CALLABLE_SECRETS, timeoutSeconds: 75 },
   async (request): Promise<QuestResponse> => {
     // A: require authentication (App Check is enforced by the runtime).
     if (!request.auth) {
@@ -102,6 +117,7 @@ export const generateCuratedQuests = functions.https.onCall(
     }
     const uid = request.auth.uid;
 
+    const context = generationContext();
     return runTrace({ type: "curated" }, async () => {
       // C: validate structure + content before any spend or slot reservation.
       const data = request.data as CuratedQuestRequest;
@@ -128,7 +144,7 @@ export const generateCuratedQuests = functions.https.onCall(
       // B: reserve the per-uid 24h curated slot (transactional, server time).
       const reservation = await span(
         "ratelimit.reserve",
-        () => reserveRateLimitSlot(uid, "curated"),
+        () => reserveRateLimitSlot(uid, "curated").catch(() => { throw generationError(new GenerationUnavailable("allowance_storage_unavailable")); }),
         {
           input: { action: "curated" },
           onResult: (r) => ({ meta: { allowed: r.allowed, retryAt: r.retryAt } }),
@@ -137,9 +153,9 @@ export const generateCuratedQuests = functions.https.onCall(
       if (!reservation.allowed) {
         setTraceField({ outcome: "rate_limited" });
         throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "You've used today's curated quest. Come back tomorrow.",
-          { retryAt: reservation.retryAt, scope: "curated" }
+          reservation.reason === "generation_in_progress" ? "unavailable" : "resource-exhausted",
+          reservation.reason === "generation_in_progress" ? "A quest is already being generated. Please try again shortly." : "You've used today's curated quest. Come back tomorrow.",
+          { retryAt: reservation.retryAt, scope: "curated", reason: reservation.reason }
         );
       }
 
@@ -154,8 +170,10 @@ export const generateCuratedQuests = functions.https.onCall(
         if (cache && cache.nextBatch && cache.nextBatch.length > 0) {
           const builtForThisProfile = cache.nextBatchHash === hash;
           const age = Date.now() - (cache.nextBatchCreatedAt ?? 0);
-          const fresh = age < BATCH_TTL_MS;
-          cacheHit = builtForThisProfile && fresh;
+          const fresh = age >= 0 && age < BATCH_TTL_MS;
+          const excluded = new Set((excludeTitles ?? []).map(title => title.trim().toLocaleLowerCase()));
+          const compatible = cache.nextBatch.every(quest => !excluded.has(quest.title.trim().toLocaleLowerCase()));
+          cacheHit = builtForThisProfile && fresh && compatible;
         }
         recordSpan("cache.lookup", {
           // No profileHash/cachedHash: a stable digest of the profile would
@@ -172,42 +190,25 @@ export const generateCuratedQuests = functions.https.onCall(
         if (cacheHit) {
           batch = cache!.nextBatch!;
         } else {
-          batch = await generateBatch(profile, CURATED_BATCH_SIZE, excludeTitles ?? []);
+          batch = await generateBatch(profile, CURATED_BATCH_SIZE, excludeTitles ?? [], context);
         }
-
-        // These operations are independent, so run them together: invalidate
-        // the consumed cache entry (required, so it cannot be re-served) and
-        // best-effort queue the next batch.
-        await Promise.all([
-          clearPregenBatch(uid),
-          enqueuePregen({ uid, profile }),
-        ]);
 
         console.log(`[generateCuratedQuests] served ${batch.length} quests (cached=${cacheHit})`);
 
         // Record the assembled batch (reference-only, NO base64) as the trace result.
         setTraceField({ result: { quests: batch } });
 
-        // Embed hero-image bytes for the response ONLY. The selected cache batch
-        // and trace result stay reference-only and under Firestore's 1MB cap.
-        // The commit runs in parallel — both are past the point of no return
-        // (quests are landing), and photo attach is best-effort (never throws).
-        // Commit starts the 24h window at delivery; a timeout before this leaves
-        // only the pending stamp (self-expires in ≤90s — no burned day).
-        const [responseBatch] = await Promise.all([
-          attachQuestPhotos(batch),
-          span("ratelimit.commit", () => commitRateLimitSlot(uid, "curated")),
-        ]);
+        const responseBatch = await attachQuestPhotos(batch);
+        await span("ratelimit.commit", () => commitRateLimitSlot(uid, "curated", reservation.reservationId, cacheHit ? cache! : undefined));
+        // Delivery is committed first. Queueing failure never rolls back a success.
+        await enqueuePregen({ uid, profile, jobId: randomUUID(), profileHash: hash,
+          expiresAt: Date.now() + 3_600_000, excludeTitles: [...(excludeTitles ?? []), ...batch.map(quest => quest.title)].slice(-100) });
         return { quests: responseBatch };
       } catch (error) {
         // Generation failed — free the pending slot immediately (best-effort; a
         // process death would let it self-expire within 90s instead).
-        await releaseRateLimitSlot(uid, "curated");
-        console.error("[generateCuratedQuests] Fatal error:", error);
-        throw new functions.https.HttpsError(
-          "internal",
-          "An error occurred while generating quests."
-        );
+        await releaseRateLimitSlot(uid, "curated", reservation.reservationId);
+        throw generationError(error);
       }
     });
   }
@@ -216,11 +217,10 @@ export const generateCuratedQuests = functions.https.onCall(
 /**
  * `generateUserDescribedQuest` — one tailored quest from a freeform
  * prompt. Auto-decides real-location vs location-agnostic. Limited to one per
- * day per device: a repeat with the SAME prompt re-serves (retry-safe), a
- * DIFFERENT prompt the same day is rejected as rate-limited.
+ * rolling 24 hours per authenticated user. Failures release the pending slot.
  */
 export const generateUserDescribedQuest = functions.https.onCall(
-  { enforceAppCheck: true, secrets: CALLABLE_SECRETS },
+  { enforceAppCheck: true, secrets: CALLABLE_SECRETS, timeoutSeconds: 75 },
   async (request): Promise<DescribedQuestResponse> => {
     // A: require authentication (App Check is enforced by the runtime).
     if (!request.auth) {
@@ -231,6 +231,7 @@ export const generateUserDescribedQuest = functions.https.onCall(
     }
     const uid = request.auth.uid;
 
+    const context = generationContext();
     return runTrace({ type: "described" }, async () => {
       // C: validate structure + content before any spend or slot reservation.
       const data = request.data as DescribedQuestRequest;
@@ -269,7 +270,7 @@ export const generateUserDescribedQuest = functions.https.onCall(
       // B: reserve the per-uid 24h described slot (transactional, server time).
       const reservation = await span(
         "ratelimit.reserve",
-        () => reserveRateLimitSlot(uid, "described"),
+        () => reserveRateLimitSlot(uid, "described").catch(() => { throw generationError(new GenerationUnavailable("allowance_storage_unavailable")); }),
         {
           input: { action: "described" },
           onResult: (r) => ({ meta: { allowed: r.allowed, retryAt: r.retryAt } }),
@@ -278,37 +279,27 @@ export const generateUserDescribedQuest = functions.https.onCall(
       if (!reservation.allowed) {
         setTraceField({ outcome: "rate_limited" });
         throw new functions.https.HttpsError(
-          "resource-exhausted",
-          "You've used today's custom quest. Come back tomorrow.",
-          { retryAt: reservation.retryAt, scope: "described" }
+          reservation.reason === "generation_in_progress" ? "unavailable" : "resource-exhausted",
+          reservation.reason === "generation_in_progress" ? "A quest is already being generated. Please try again shortly." : "You've used today's custom quest. Come back tomorrow.",
+          { retryAt: reservation.retryAt, scope: "described", reason: reservation.reason }
         );
       }
 
       try {
-        const quest = await generateDescribed(prompt, profile);
+        const quest = await generateDescribed(prompt, profile, context);
         if (!quest) {
           throw new Error("Describe generation produced no quest.");
         }
         console.log("[generateUserDescribedQuest] served a described quest");
         setTraceField({ result: { quest } });
-        // Embed the hero-image bytes for the response (nothing to persist — a
-        // described quest is one-off and isn't cached). Commit runs in parallel:
-        // the quest is landing and photo attach is best-effort (never throws).
-        // Commit starts the 24h window at delivery.
-        const [[responseQuest]] = await Promise.all([
-          attachQuestPhotos([quest]),
-          span("ratelimit.commit", () => commitRateLimitSlot(uid, "described")),
-        ]);
+        const [responseQuest] = await attachQuestPhotos([quest]);
+        await span("ratelimit.commit", () => commitRateLimitSlot(uid, "described", reservation.reservationId));
         return { quest: responseQuest };
       } catch (error) {
         // Generation failed — free the pending slot immediately (best-effort; a
         // process death would let it self-expire within 90s instead).
-        await releaseRateLimitSlot(uid, "described");
-        console.error("[generateUserDescribedQuest] Fatal error:", error);
-        throw new functions.https.HttpsError(
-          "internal",
-          "An error occurred while crafting your quest."
-        );
+        await releaseRateLimitSlot(uid, "described", reservation.reservationId);
+        throw generationError(error);
       }
     });
   }

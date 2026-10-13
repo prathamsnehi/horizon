@@ -5,13 +5,11 @@ import { defineSecret } from "firebase-functions/params";
 // --------
 
 // pulled directly from GC secrets manager
-export const geminiApiKey = defineSecret("GEMINI_API_KEY");
+export const tokenrouterApiKey = defineSecret("TOKENROUTER_API_KEY");
 export const placesApiKey = defineSecret("PLACES_API_KEY");
 
-// Additional LLM providers for the multi-provider routing layer (all free-tier).
+// Independent foreground-only free fallback.
 export const groqApiKey = defineSecret("GROQ_API_KEY");
-export const mistralApiKey = defineSecret("MISTRAL_API_KEY");
-export const cerebrasApiKey = defineSecret("CEREBRAS_API_KEY");
 
 /**
  * Comma-separated uids exempt from the per-user 24h generation limit —
@@ -26,8 +24,8 @@ export const cerebrasApiKey = defineSecret("CEREBRAS_API_KEY");
  * nothing gates every user normally.
  *
  * Safe to leave configured: `request.auth.uid` comes from a signed Firebase
- * Auth token, so only the account owner can present it, and total spend stays
- * bounded by the Maps daily quotas and the per-provider LLM rate windows.
+ * Auth token, so only the account owner can present it, and all AI calls still pass
+ * through shared provider admission. Spending is monitored, without a daily cap.
  */
 export const rateLimitExemptUids = defineSecret("RATE_LIMIT_EXEMPT_UIDS");
 

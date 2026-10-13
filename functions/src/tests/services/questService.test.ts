@@ -12,8 +12,9 @@ jest.mock("../../integrations/maps", () => ({
   fetchPlacePhotoBytes: jest.fn(),
 }));
 
-import { generateDescribed, attachQuestPhotos } from "../../services/questService";
+import { generateBatch, generateDescribed, attachQuestPhotos } from "../../services/questService";
 import {
+  generateLocationConcepts,
   planDescribedQuest,
   generateQuestsWriter,
   generateGenericQuests,
@@ -152,4 +153,16 @@ describe("attachQuestPhotos", () => {
 
     expect(result.locationInformation?.photoImageBase64).toBeUndefined();
   });
+});
+
+it("returns valid writer quests when generic deficit filling fails", async () => {
+  (generateLocationConcepts as jest.Mock).mockResolvedValue([{ textQuery: "cafe", intendedDifficulty: "easy" }]);
+  maps.mockResolvedValue(loc); writer.mockResolvedValue([item("Valid")]);
+  generic.mockRejectedValue(new Error("busy"));
+  expect(await generateBatch(profile, 3)).toEqual([item("Valid")]);
+});
+it("does not claim success when deficit filling fails with no quests", async () => {
+  (generateLocationConcepts as jest.Mock).mockResolvedValue([{ textQuery: "cafe", intendedDifficulty: "easy" }]);
+  maps.mockResolvedValue(null); generic.mockRejectedValue(new Error("busy"));
+  await expect(generateBatch(profile, 3)).rejects.toThrow("busy");
 });
